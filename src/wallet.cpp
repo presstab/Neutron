@@ -2396,15 +2396,19 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     bool hasPayment = true;
     if(bMasterNodePayment) {
         //spork
-        if(!masternodePayments.GetBlockPayee(pindexPrev->nHeight+1, payee)){
+        if(!masternodePayments.GetBlockPayee(pindexPrev->nHeight+1, payee))
+		{
+            printf("*** Createcoinstake failed to GetBlockPayee \n");
             int winningNode = GetCurrentMasterNode(1);
                 if(winningNode >= 0){
                     payee =GetScriptForDestination(vecMasternodes[winningNode].pubkey.GetID());
                 } else {
                     return error("CreateCoinStake: Failed to detect masternode to pay\n");
-                    hasPayment = false;
+                    //hasPayment = false;
                 }
         }
+        else
+            printf("*** Createcoinstake got payee from GetBlockPayee \n");
     }
 
     if(hasPayment){

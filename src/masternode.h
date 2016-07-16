@@ -57,7 +57,6 @@ extern map<int64_t, uint256> mapCacheBlockHashes;
 void ProcessMasternodeConnections();
 int CountMasternodesAboveProtocol(int protocolVersion);
 
-
 void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
 
 //
@@ -153,6 +152,16 @@ public:
 
         return cacheInputAge+(pindexBest->nHeight-cacheInputAgeBlock);
     }
+
+    CBitcoinAddress GetBitcoinAddress()
+    {
+        CScript mnScript = GetScriptForDestination(pubkey.GetID());
+        CTxDestination dest;
+        ExtractDestination(mnScript, dest);
+        CBitcoinAddress address(dest);
+
+        return address;
+    }
 };
 
 
@@ -244,6 +253,7 @@ public:
 
     //slow
     bool GetBlockPayee(int nBlockHeight, CScript& payee);
+    bool FindMasterNode(CScript script);
 };
 
 

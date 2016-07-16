@@ -49,8 +49,8 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
     if (strCommand == "dsee") { //DarkSend Election Entry
         if(fLiteMode) return; //disable all darksend/masternode related functionality
 
-        bool fIsInitialDownload = IsInitialBlockDownload();
-        if(fIsInitialDownload) return;
+        if(IsInitialBlockDownload()) 
+            return;
 
         CTxIn vin;
         CService addr;
@@ -148,7 +148,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
             return;
         }
 
-        if(fDebug) printf("dsee - Got NEW masternode entry %s\n", addr.ToString().c_str());
+        printf("dsee - Got NEW masternode entry %s\n", addr.ToString().c_str());
 
         // make sure it's still unspent
         //  - this is checked later by .check() in many places and by ThreadCheckDarkSendPool()
@@ -161,7 +161,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
         //if(AcceptableInputs(mempool, state, tx)){
 	bool* pfMissingInputs = false;
 	if(AcceptableInputs(mempool, tx, false, pfMissingInputs)){
-            if(fDebug) printf("dsee - Accepted masternode entry %i %i\n", count, current);
+            printf("dsee - Accepted masternode entry %i %i\n", count, current);
 
             if(GetInputAge(vin) < MASTERNODE_MIN_CONFIRMATIONS){
                 printf("dsee - Input must have least %d confirmations\n", MASTERNODE_MIN_CONFIRMATIONS);
@@ -253,7 +253,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
             }
         }
 
-        if(fDebug) printf("dseep - Couldn't find masternode entry %s\n", vin.ToString().c_str());
+        printf("dseep - Couldn't find masternode entry %s\n", vin.ToString().c_str());
 
         std::map<COutPoint, int64_t>::iterator i = askedForMasternodeListEntry.find(vin.prevout);
         if (i != askedForMasternodeListEntry.end()){
@@ -307,11 +307,11 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
             if(vin == CTxIn()){
                 mn.Check();
                 if(mn.IsEnabled()) {
-                    if(fDebug) printf("dseg - Sending masternode entry - %s \n", mn.addr.ToString().c_str());
+                    printf("dseg - Sending masternode entry - %s \n", mn.addr.ToString().c_str());
                     pfrom->PushMessage("dsee", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, count, i, mn.lastTimeSeen, mn.protocolVersion);
                 }
             } else if (vin == mn.vin) {
-                if(fDebug) printf("dseg - Sending masternode entry - %s \n", mn.addr.ToString().c_str());
+                printf("dseg - Sending masternode entry - %s \n", mn.addr.ToString().c_str());
                 pfrom->PushMessage("dsee", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, count, i, mn.lastTimeSeen, mn.protocolVersion);
                 printf("dseg - Sent 1 masternode entries to %s\n", pfrom->addr.ToString().c_str());
                 return;
@@ -321,7 +321,35 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
 
         printf("dseg - Sent %d masternode entries to %s\n", count, pfrom->addr.ToString().c_str());
     }
+    else if (strCommand == "dsegadd") //request for specific masternode by Neutron address
+    {
+        std::string strAddress;
+        vRecv >> strAddress;
+        CBitcoinAddress mnAddress(strAddress);
 
+        if(mnAddress == CBitcoinAddress())//blank address
+        {
+            printf("*** dsegadd - Blank address request \n");
+            return;
+        }
+
+        int count = vecMasternodes.size();
+        int i = 0;
+        BOOST_FOREACH(CMasterNode mn, vecMasternodes)
+        {
+            if(mn.GetBitcoinAddress() == mnAddress)
+            {
+                printf("*** desegadd - found masternode, send it \n");
+                pfrom->PushMessage("dsee", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, count, i, mn.lastTimeSeen, mn.protocolVersion);
+                return;
+            }
+
+            i++;
+        }
+
+        printf("*** dsegadd - failed to find requested masternod \n");
+        return;
+    }
     else if (strCommand == "mnget") { //Masternode Payments Request Sync
         if(fLiteMode) return; //disable all darksend/masternode related functionality
 
@@ -345,7 +373,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
 
         uint256 hash = winner.GetHash();
         if(mapSeenMasternodeVotes.count(hash)) {
-            if(fDebug) printf("mnw - seen vote %s Height %d bestHeight %d\n", hash.ToString().c_str(), winner.nBlockHeight, pindexBest->nHeight);
+            printf("mnw - seen vote %s Height %d bestHeight %d\n", hash.ToString().c_str(), winner.nBlockHeight, pindexBest->nHeight);
             return;
         }
 
@@ -661,9 +689,9 @@ uint64_t CMasternodePayments::CalculateScore(uint256 blockHash, CTxIn& vin)
     uint256 n3 = Hash(BEGIN(vin.prevout.hash), END(vin.prevout.hash));
     uint256 n4 = n3 > n2 ? (n3 - n2) : (n2 - n3);
 
-    //printf(" -- CMasternodePayments CalculateScore() n2 = %d \n", n2.Get64());
-    //printf(" -- CMasternodePayments CalculateScore() n3 = %d \n", n3.Get64());
-    //printf(" -- CMasternodePayments CalculateScore() n4 = %d \n", n4.Get64());
+    printf(" -- CMasternodePayments CalculateScore() n2 = %d \n", n2.Get64());
+    printf(" -- CMasternodePayments CalculateScore() n3 = %d \n", n3.Get64());
+    printf(" -- CMasternodePayments CalculateScore() n4 = %d \n", n4.Get64());
 
     return n4.Get64();
 }
@@ -676,7 +704,10 @@ bool CMasternodePayments::GetBlockPayee(int nBlockHeight, CScript& payee)
             return true;
         }
     }
-
+	
+	printf("*** unable to find payee \n");
+	printf("*** vWinning size %d \n", vWinning.size());
+	
     return false;
 }
 
@@ -702,6 +733,7 @@ bool CMasternodePayments::AddWinningMasternode(CMasternodePaymentWinner& winnerI
     winnerIn.score = CalculateScore(blockHash, winnerIn.vin);
 
     bool foundBlock = false;
+	//if the winner is not in the vWinning vector then add it, if it is then update the score
     BOOST_FOREACH(CMasternodePaymentWinner& winner, vWinning){
         if(winner.nBlockHeight == winnerIn.nBlockHeight) {
             foundBlock = true;
@@ -834,4 +866,31 @@ bool CMasternodePayments::SetPrivKey(std::string strPrivKey)
     } else {
         return false;
     }
+}
+
+bool CMasternodePayments::FindMasterNode(CScript script)
+{
+    
+    CTxDestination dest;
+    ExtractDestination(script, dest);
+    CBitcoinAddress address(dest);
+
+    printf("*** FindMasterNode(): address: %s \n", address.ToString().c_str());
+
+    BOOST_FOREACH(CMasterNode mn, vecMasternodes)
+    {
+        CScript mnScript = GetScriptForDestination(mn.pubkey.GetID());
+
+        CTxDestination address1;
+        ExtractDestination(mnScript, address1);
+        CBitcoinAddress address2(address1);
+
+        printf("*** FindMasterNode(): mnAddress: %s \n", address2.ToString().c_str());
+        
+
+        if(mnScript == script)
+            return true;
+    }
+
+    return false;
 }

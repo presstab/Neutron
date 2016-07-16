@@ -740,9 +740,9 @@ bool AcceptableInputs(CTxMemPool& pool, const CTransaction &txo, bool fLimitFree
     }
 
 
-    printf("AcceptableInputs : accepted %s (poolsz %u)\n",
-           hash.ToString().c_str(),
-           pool.mapTx.size());
+    //printf("AcceptableInputs : accepted %s (poolsz %u)\n",
+      //     hash.ToString().c_str(),
+        //   pool.mapTx.size());
     return true;
 }
 
@@ -1586,6 +1586,29 @@ int64_t CTransaction::GetValueIn(const MapPrevTx& inputs) const
 
 }
 
+int64_t CTransaction::GetValueIn() const
+{
+    std::map<CTxDestination, int64_t> mapInAmounts;
+    int64_t nValueIn = 0;
+    BOOST_FOREACH(const CTxIn& txin, vin)
+    {
+        //search disk for VIN info
+        uint256 hashBlockPrev;
+        CTransaction txPrev;
+        if(!GetTransaction(txin.prevout.hash, txPrev, hashBlockPrev))
+            return -1;
+
+        CTxDestination inAddress;
+        ExtractDestination(txPrev.vout[txin.prevout.n].scriptPubKey, inAddress);
+        
+        //keep track of how input amounts
+        nValueIn += txPrev.vout[txin.prevout.n].nValue;
+    }
+
+    return nValueIn;
+}
+
+
 unsigned int CTransaction::GetP2SHSigOpCount(const MapPrevTx& inputs) const
 {
     if (IsCoinBase())
@@ -2294,7 +2317,84 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos, const u
 }
 
 
+bool CBlock::CheckMasterNodePayment() const
+{
+    LOCK2(cs_main, mempool.cs);
+    
+    if(!IsProofOfStake() && pindexBest == NULL)
+    {
+        printf("*** CheckBlock() : pindex is null, skipping masternode payment check\n");
+        return true;
+    }
+        
+    if(pindexBest->GetBlockHash() != hashPrevBlock)
+    {
+        printf("*** CheckBlock() : Skipping masternode payment check - nHeight %d Hash %s\n", 
+            pindexBest->nHeight+1, GetHash().ToString().c_str());
+        return true;
+    }
+    
+    //need to use the stake reward amount, before this was using the full output sum
+    CAmount masternodePaymentAmount = GetMasternodePayment(pindexBest->nHeight+1, vtx[1].GetValueOut() - vtx[1].GetValueIn());
+    printf("*** required mn payment %s \n", FormatMoney(masternodePaymentAmount).c_str());
 
+    // If it is the initial download then skip the masternode checks
+    if (IsInitialBlockDownload())
+    {
+        printf("*** CheckBlock() : Is initial download, skipping masternode payment check %d\n", pindexBest->nHeight+1);
+        return true;
+    }
+
+    CScript payee;
+    bool foundPaymentAmount = false;
+    bool foundPayee = false;
+    bool foundPaymentAndPayee = false;
+                
+    //scan the coinstake tx to see if we get positive results for the masternode and mn payment amount
+    for (unsigned int i = 0; i < vtx[1].vout.size(); i++) 
+    {
+        if(vtx[1].vout[i].nValue == masternodePaymentAmount)
+        {
+            foundPaymentAmount = true;
+            payee = vtx[1].vout[i].scriptPubKey;
+
+            BOOST_FOREACH(CNode* pNode, vNodes)
+            {
+                pNode->PushMessage("mnget");
+                if(masternodePayments.FindMasterNode(payee))
+                {
+                    printf("*** found master node \n");
+                    foundPayee = true;
+                    break;
+                }
+                else
+                    printf("*** did not find master node, but mn payment was given to someone \n");
+            }
+        }
+                    
+        //temp disable this
+        //if(vtx[1].vout[i].nValue == masternodePaymentAmount && vtx[1].vout[i].scriptPubKey == payee)
+            foundPaymentAndPayee = true;
+    }
+                
+    if(!foundPaymentAmount)
+            printf("*** REJECT THIS BLOCK AFTER FORK \n");
+
+    if(!foundPaymentAndPayee) 
+    {
+        CTxDestination address1;
+        ExtractDestination(payee, address1);
+        CBitcoinAddress address2(address1);
+
+        printf("*** CheckBlock() : Couldn't find masternode payment(%d|%d) or payee(%d|%s) nHeight %d. \n", 
+            foundPaymentAmount, masternodePaymentAmount, foundPayee, address2.ToString().c_str(), pindexBest->nHeight+1);
+        return DoS(100, error("CheckBlock() : Couldn't find masternode payment or payee"));
+    } 
+    
+    printf("CheckBlock() : Found masternode payment %d of amount %s\n", pindexBest->nHeight+1, FormatMoney(masternodePaymentAmount).c_str());
+                
+    return true;
+}
 
 bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) const
 {
@@ -2346,69 +2446,10 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
             return DoS(100, error("CheckBlock() : bad proof-of-stake block signature"));
     }
 
-    // ----------- masternode payments -----------
 
-    bool MasternodePayments = false;
-
-    if(nTime > START_MASTERNODE_PAYMENTS) MasternodePayments = true;
-   
-    if(MasternodePayments)
-    {
-        LOCK2(cs_main, mempool.cs);
-
-        CBlockIndex *pindex = pindexBest;
-        if(IsProofOfStake() && pindex != NULL){
-            if(pindex->GetBlockHash() == hashPrevBlock){
-                CAmount masternodePaymentAmount = GetMasternodePayment(pindex->nHeight+1, vtx[1].GetValueOut());
-                bool fIsInitialDownload = IsInitialBlockDownload();
-
-                // If we don't already have its previous block, skip masternode payment step
-                if (!fIsInitialDownload && pindex != NULL)
-                {
-                    bool foundPaymentAmount = false;
-                    bool foundPayee = false;
-                    bool foundPaymentAndPayee = false;
-
-                    CScript payee;
-                    if(!masternodePayments.GetBlockPayee(pindexBest->nHeight+1, payee) || payee == CScript()){
-                        foundPayee = true; //doesn't require a specific payee
-                        foundPaymentAmount = true;
-                        foundPaymentAndPayee = true;
-                        if(fDebug) { printf("CheckBlock() : Using non-specific masternode payments %d\n", pindexBest->nHeight+1); }
-                    }
-
-                    for (unsigned int i = 0; i < vtx[1].vout.size(); i++) {
-                        if(vtx[1].vout[i].nValue == masternodePaymentAmount )
-                            foundPaymentAmount = true;
-                        if(vtx[1].vout[i].scriptPubKey == payee )
-                            foundPayee = true;
-                        if(vtx[1].vout[i].nValue == masternodePaymentAmount && vtx[1].vout[i].scriptPubKey == payee)
-                            foundPaymentAndPayee = true;
-                    }
-
-                    if(!foundPaymentAndPayee) {
-                        CTxDestination address1;
-                        ExtractDestination(payee, address1);
-                        CBitcoinAddress address2(address1);
-
-                        if(fDebug) { printf("CheckBlock() : Couldn't find masternode payment(%d|%d) or payee(%d|%s) nHeight %d. \n", foundPaymentAmount, masternodePaymentAmount, foundPayee, address2.ToString().c_str(), pindexBest->nHeight+1); }
-                        return DoS(100, error("CheckBlock() : Couldn't find masternode payment or payee"));
-                    } else {
-                        if(fDebug) { printf("CheckBlock() : Found masternode payment %d\n", pindexBest->nHeight+1); }
-                    }
-                } else {
-                    if(fDebug) { printf("CheckBlock() : Is initial download, skipping masternode payment check %d\n", pindexBest->nHeight+1); }
-                }
-            } else {
-                if(fDebug) { printf("CheckBlock() : Skipping masternode payment check - nHeight %d Hash %s\n", pindexBest->nHeight+1, GetHash().ToString().c_str()); }
-            }
-        } else {
-            if(fDebug) { printf("CheckBlock() : pindex is null, skipping masternode payment check\n"); }
-        }
-    } else {
-        if(fDebug) { printf("CheckBlock() : skipping masternode payment checks\n"); }
-    }
-
+    //Check For Master Node Payment   
+    if(nTime > START_MASTERNODE_PAYMENTS)
+        CheckMasterNodePayment();
 
     // Check transactions
     BOOST_FOREACH(const CTransaction& tx, vtx)
@@ -4209,7 +4250,5 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
 
 int64_t GetMasternodePayment(int nHeight, int64_t blockValue)
 {
-    int64_t ret = blockValue * 0.66; //66%
-
-    return ret;
+    return blockValue * 0.66; //66%
 }
