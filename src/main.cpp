@@ -2358,9 +2358,23 @@ bool CBlock::CheckMasterNodePayment() const
             foundPaymentAmount = true;
             payee = vtx[1].vout[i].scriptPubKey;
 
+            CTxDestination dest;
+            ExtractDestination(payee, dest);
+            CBitcoinAddress address(dest);
+            std::string strAddress = address.ToString();
+
             BOOST_FOREACH(CNode* pNode, vNodes)
             {
-                pNode->PushMessage("mnget");
+                if(pNode->nVersion == 60020)
+                {
+                    //use new address request
+                    printf("*** requesting address %s from node \n", strAddress.c_str());
+                    pNode->PushMessage("dsegadd", strAddress);
+                    sleep(500);
+                }
+                else
+                    pNode->PushMessage("mnget");
+
                 if(masternodePayments.FindMasterNode(payee))
                 {
                     printf("*** found master node \n");
