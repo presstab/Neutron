@@ -2322,10 +2322,7 @@ bool CBlock::CheckMasterNodePayment() const
     LOCK2(cs_main, mempool.cs);
     
     if(!IsProofOfStake() && pindexBest == NULL)
-    {
-        printf("*** CheckBlock() : pindex is null, skipping masternode payment check\n");
         return true;
-    }
         
     if(pindexBest->GetBlockHash() != hashPrevBlock)
     {
@@ -2333,17 +2330,17 @@ bool CBlock::CheckMasterNodePayment() const
             pindexBest->nHeight+1, GetHash().ToString().c_str());
         return true;
     }
-    
-    //need to use the stake reward amount, before this was using the full output sum
-    CAmount masternodePaymentAmount = GetMasternodePayment(pindexBest->nHeight+1, vtx[1].GetValueOut() - vtx[1].GetValueIn());
-    printf("*** required mn payment %s \n", FormatMoney(masternodePaymentAmount).c_str());
 
     // If it is the initial download then skip the masternode checks
-    if (IsInitialBlockDownload())
+    if (IsInitialBlockDownload() || GetAdjustedTime() - nTime > 10*60)
     {
         printf("*** CheckBlock() : Is initial download, skipping masternode payment check %d\n", pindexBest->nHeight+1);
         return true;
     }
+
+    //need to use the stake reward amount, before this was using the full output sum
+    CAmount masternodePaymentAmount = GetMasternodePayment(pindexBest->nHeight+1, vtx[1].GetValueOut() - vtx[1].GetValueIn());
+    printf("*** required mn payment %s \n", FormatMoney(masternodePaymentAmount).c_str());
 
     CScript payee;
     bool foundPaymentAmount = false;
@@ -2355,44 +2352,18 @@ bool CBlock::CheckMasterNodePayment() const
     {
         if(vtx[1].vout[i].nValue == masternodePaymentAmount)
         {
-            foundPaymentAmount = true;
-            payee = vtx[1].vout[i].scriptPubKey;
+            //find the masternode winner for this block and see if it is who was payed
+            //if the winner does not match then we either don't have this masternode info
+            //or this peer gave the wrong person the payment and this block should be rejected
+			if(!masternodePayments.GetBlockPayee(pindexBest->nHeight + 1, payee))
+				foundPayee = false;
+			
+			if(payee != vtx[1].vout[i].scriptPubKey)
+				continue;
 
-            CTxDestination dest;
-            ExtractDestination(payee, dest);
-            CBitcoinAddress address(dest);
-            std::string strAddress = address.ToString();
-
-            BOOST_FOREACH(CNode* pNode, vNodes)
-            {
-                if(pNode->nVersion == 60020)
-                {
-                    //use new address request
-                    printf("*** requesting address %s from node \n", strAddress.c_str());
-                    pNode->PushMessage("dsegadd", strAddress);
-                    sleep(500);
-                }
-                else
-                    pNode->PushMessage("mnget");
-
-                if(masternodePayments.FindMasterNode(payee))
-                {
-                    printf("*** found master node \n");
-                    foundPayee = true;
-                    break;
-                }
-                else
-                    printf("*** did not find master node, but mn payment was given to someone \n");
-            }
+			foundPaymentAndPayee = true;
         }
-                    
-        //temp disable this
-        //if(vtx[1].vout[i].nValue == masternodePaymentAmount && vtx[1].vout[i].scriptPubKey == payee)
-            foundPaymentAndPayee = true;
     }
-                
-    if(!foundPaymentAmount)
-            printf("*** REJECT THIS BLOCK AFTER FORK \n");
 
     if(!foundPaymentAndPayee) 
     {
@@ -2402,7 +2373,7 @@ bool CBlock::CheckMasterNodePayment() const
 
         printf("*** CheckBlock() : Couldn't find masternode payment(%d|%d) or payee(%d|%s) nHeight %d. \n", 
             foundPaymentAmount, masternodePaymentAmount, foundPayee, address2.ToString().c_str(), pindexBest->nHeight+1);
-        return DoS(100, error("CheckBlock() : Couldn't find masternode payment or payee"));
+        return false;
     } 
     
     printf("CheckBlock() : Found masternode payment %d of amount %s\n", pindexBest->nHeight+1, FormatMoney(masternodePaymentAmount).c_str());
@@ -2460,10 +2431,14 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
             return DoS(100, error("CheckBlock() : bad proof-of-stake block signature"));
     }
 
-
     //Check For Master Node Payment   
     if(nTime > START_MASTERNODE_PAYMENTS)
-        CheckMasterNodePayment();
+    {
+        if(!CheckMasterNodePayment())
+        	printf("*** MASTERNODE CHECK FAILED, REJECT THIS BLOCK AFTER FORK \n");
+        else
+        	printf("*** MASTERNODE CHECK PASSED \n");
+    }
 
     // Check transactions
     BOOST_FOREACH(const CTransaction& tx, vtx)

@@ -81,6 +81,9 @@ public:
     bool unitTest;
     bool allowFreeTx;
     int protocolVersion;
+    bool valid;
+    uint256 requestedHash;
+    int64_t checkTime;
 
     //the dsq count from the last dsq broadcast of this node
     int64_t nLastDsq;
@@ -102,7 +105,23 @@ public:
         lastDseep = 0;
         allowFreeTx = true;
         protocolVersion = protocolVersionIn;
+        valid = true; //assume valid unless something triggers otherwise
+        requestedHash = uint256(0);
+        checkTime = 0;
     }
+
+    void MarkValid(int64_t nTime)
+    {
+        valid = true;
+        checkTime = nTime;
+    }
+
+    void MarkInvalid(int64_t nTime)
+    {
+        valid = false;
+        checkTime = nTime;
+    }
+
 
     uint256 CalculateScore(int mod=1, int64_t nBlockHeight=0);
 
@@ -151,16 +170,6 @@ public:
         }
 
         return cacheInputAge+(pindexBest->nHeight-cacheInputAgeBlock);
-    }
-
-    CBitcoinAddress GetBitcoinAddress()
-    {
-        CScript mnScript = GetScriptForDestination(pubkey.GetID());
-        CTxDestination dest;
-        ExtractDestination(mnScript, dest);
-        CBitcoinAddress address(dest);
-
-        return address;
     }
 };
 
@@ -219,6 +228,7 @@ class CMasternodePayments
 {
 private:
     std::vector<CMasternodePaymentWinner> vWinning;
+	std::map<unsigned int, CMasternodePaymentWinner> vWinningByHeight;
     int nSyncedFromPeer;
     std::string strMasterPrivKey;
     std::string strTestPubKey;
@@ -236,6 +246,7 @@ public:
     bool SetPrivKey(std::string strPrivKey);
     bool CheckSignature(CMasternodePaymentWinner& winner);
     bool Sign(CMasternodePaymentWinner& winner);
+    bool Sign(std::vector<unsigned char>& vchSig, std::string strMessage);
 
     // Deterministically calculate a given "score" for a masternode depending on how close it's hash is
     // to the blockHeight. The further away they are the better, the furthest will win the election
@@ -246,10 +257,17 @@ public:
     bool GetWinningMasternode(int nBlockHeight, CTxIn& vinOut);
     bool AddWinningMasternode(CMasternodePaymentWinner& winner);
     bool ProcessBlock(int nBlockHeight);
+
     void Relay(CMasternodePaymentWinner& winner);
     void Sync(CNode* node);
     void CleanPaymentList();
     int LastPayment(CMasterNode& mn);
+	void PopulateMasterNodeWinningList();
+
+    bool IsEnabled()
+    {
+        return enabled;
+    }
 
     //slow
     bool GetBlockPayee(int nBlockHeight, CScript& payee);
