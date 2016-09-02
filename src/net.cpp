@@ -11,6 +11,7 @@
 #include "addrman.h"
 #include "ui_interface.h"
 #include "darksend.h"
+#include "masternodechecker.h"
 #include "wallet.h"
 
 #ifdef WIN32
@@ -1396,6 +1397,50 @@ void static ProcessOneShot()
         if (!OpenNetworkConnection(addr, &grant, strDest.c_str(), true))
             AddOneShot(strDest);
     }
+}
+
+void static ConnectToMasternodes()
+{
+
+    if(!masternodeChecker.GetPendingCount())
+        return;
+
+    CMasterNode* mn = masternodeChecker.GetNextPending();
+
+    //if we have tried to connect 5 times, lets consider this mn as invalid
+    if(mn->connectAttempts > 5)
+        masternodeChecker.Reject(mn);
+
+    //connect to this masternode
+    CAddress addr;
+    CSemaphoreGrant grant(*semOutbound, true);
+    if(!OpenNetworkConnection(addr, &grant, mn->addr.ToString().c_str()))
+    {
+        mn->connectAttempts++;
+        AddOneShot(mn->addr.ToString().c_str());
+        return;
+    }
+
+    MilliSleep(500);
+
+    LOCK(cs_vNodes);
+
+    bool fSent = false;
+    BOOST_FOREACH(CNode* pnode, vNodes)
+    {
+        if(pnode->addrLocal == mn->addr)
+        {
+            masternodeChecker.SendVerifyRequest(mn, pnode);
+            fSent = true;
+        }
+    }
+
+    if(!fSent)
+    {
+        mn->connectAttempts++;
+        printf("ConnectToMasternodes(): failed to send to node \n");
+    }
+
 }
 
 void static ThreadStakeMiner(void* parg)

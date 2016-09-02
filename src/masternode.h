@@ -81,6 +81,7 @@ public:
     bool unitTest;
     bool allowFreeTx;
     int protocolVersion;
+    int connectAttempts;
     bool valid;
     uint256 requestedHash;
     int64_t checkTime;
@@ -105,6 +106,7 @@ public:
         lastDseep = 0;
         allowFreeTx = true;
         protocolVersion = protocolVersionIn;
+        connectAttempts = 0;
         valid = true; //assume valid unless something triggers otherwise
         requestedHash = uint256(0);
         checkTime = 0;

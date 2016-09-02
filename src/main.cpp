@@ -17,6 +17,7 @@
 #include <boost/filesystem/fstream.hpp>
 #include "darksend.h"
 #include "masternode.h"
+#include "masternodechecker.h"
 #include "spork.h"
 
 #include <stdio.h>
@@ -39,6 +40,7 @@ unsigned int nTransactionsUpdated = 0;
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 libzerocoin::Params* ZCParams;
+CMasternodeChecker masternodeChecker;
 
 CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); // Starting Difficulty: results with 0,000244140625 proof-of-work difficulty
 CBigNum bnProofOfStakeLimit(~uint256(0) >> 20);
