@@ -420,7 +420,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
         }
 
         //this mn passed the test, mark as valid
-        mn->MarkValid(GetTime());
+        masternodeChecker.Accept(mn, pfrom);
     }
 }
 

@@ -4,28 +4,48 @@
 
 void CMasternodeChecker::AddMasternode(CMasterNode* mn)
 {
-    if(find(vPending.begin(), vPending.end(), mn) != vPending.end())
+    if(AlreadyHave(mn))
         return;
 
-    vPending.push_back(mn);
+    mapPending[mn->vin] = mn;
+
+    BOOST_FOREACH(CNode* pnode, vNodes)
+    {
+        //check if we have this peer already
+        if(pnode->addrLocal == mn->addr)
+        {
+            SendVerifyRequest(mn, pnode);
+            return;
+        }
+    }
+
+    //we dont have this peer so mark as a temporary connection
+    mapTemp[mn->vin] = mn;
 }
 
 void CMasternodeChecker::Reject(CMasterNode* mn)
 {
-    vector<CMasterNode*>::iterator it = find(vPending.begin(), vPending.end(), mn);
-    if(it != vPending.end())
-        vPending.erase(it);
+    map<CTxin, CMasterNode*>::iterator it = find(mapPending.begin(), mapPending.end(), mn->vin);
+    if(it != mapPending.end())
+        mapPending.erase(it);
 
-    if(find(vRejected.begin(), vRejected.end(), mn) == vRejected.end())
-        vRejected.push_back(mn);
+    mapRejected[mn->vin] = mn;
+
+    //disconnect from peer if we marked this as a temporary peer
+    if(mapTemp.count(mn->vin))
+    {
+        pnode->CloseSocketDisconnect();
+        mapTemp.erase(mn->vin);
+        printf("CMasternodeChecker::Reject closing connection with peer because mn failed\n");
+    }
 }
 
 CMasterNode* CMasternodeChecker::GetNextPending()
 {
-    if(vPending.empty())
+    if(mapPending.empty())
         return NULL;
 
-    return vPending.front();
+    return mapPending.front();
 }
 
 void CMasternodeChecker::SendVerifyRequest(CMasterNode* mn, CNode* pnode)
@@ -39,8 +59,15 @@ void CMasternodeChecker::SendVerifyRequest(CMasterNode* mn, CNode* pnode)
     pnode->PushMessage("mnprove", hash);
 }
 
-void CMasternodeChecker::Accept(CMasterNode* mn)
+void CMasternodeChecker::Accept(CMasterNode* mn, CNode* pnode)
 {
     mn->MarkValid(GetTime());
     StatusAccepted(mn);
+
+    if(mapTemp.count(mn->vin))
+    {
+        pnode->CloseSocketDisconnect();
+        mapTemp.erase(mn->vin);
+        printf("CMasternodeChecker::Accept: closing connection with peer because mn verified\n");
+    }
 }
