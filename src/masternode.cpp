@@ -47,7 +47,6 @@ void ProcessMasternodeConnections(){
 
 void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream& vRecv)
 {
-
     if (strCommand == "dsee") { //DarkSend Election Entry
         if(fLiteMode) return; //disable all darksend/masternode related functionality
 
@@ -377,65 +376,8 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
             masternodePayments.Relay(winner);
         }
     }
-    else if(strCommand == "mnprove"){
-        // if we are a masternode, confirm that we are so the peer can verify the list
-        if(masternodePayments.IsEnabled())
-        {
-            //peer sends us a random hash to sign with our masternode pubkey
-            uint256 hash;
-            vRecv >> hash;
-
-            vector<unsigned char> vchSig;
-            if(!masternodePayments.Sign(vchSig, hash.ToString()))
-                return;
-
-            pfrom->PushMessage("mnproof", vchSig);
-        }
-    }
-    else if(strCommand == "mnproof")
-    {
-        vector<unsigned char> vchSig;
-        vRecv >> vchSig;
-        
-        //find the masternode entry for this peer
-        CMasterNode* mn;
-        bool fFound = false;
-        BOOST_FOREACH(CMasterNode m, vecMasternodes)
-        {
-            if(m.addr == pfrom->addrLocal) //note need to double check this logic
-            {
-                mn = &m;
-                fFound = true;
-            }
-        }
-
-        if(!fFound || mn->requestedHash == uint256(0))
-            return;
-
-        string errorMessage;
-        if(!darkSendSigner.VerifyMessage(mn->pubkey2, vchSig, mn->requestedHash.ToString(), errorMessage))
-        {
-            //this masternode failed our verification test, this is not a valid masternode
-
-            masternodeChecker.Reject(mn, pfrom);
-            return;
-        }
-
-        //this mn passed the test, mark as valid
-        masternodeChecker.Accept(mn, pfrom);
-    }
-    else if(strCommand == "mncount")
-    {
-        pfrom->PushMessage("mncounted", masternodeChecker.GetMasternodeCount());
-    }
-    else if(strCommand == "mncounted")
-    {
-        int nCount = 0;
-        vRecv >> nCount;
-
-        if(!masternodeChecker.InSync(nCount))
-            masternodeChecker.SendList(pfrom);
-    }
+    else
+        masternodeChecker.ProcessCheckerMessage(pfrom, strCommand, vRecv);
 }
 
 struct CompareValueOnly

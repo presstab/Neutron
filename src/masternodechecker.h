@@ -26,6 +26,7 @@ public:
     void Accept(CMasterNode* mn, CNode* pnode);
     void RequestSyncWithPeers();
     void SendList(CNode* pnode);
+    void ProcessCheckerMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
 
     int GetPendingCount()
     {
