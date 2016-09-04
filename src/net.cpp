@@ -1399,6 +1399,16 @@ void static ProcessOneShot()
     }
 }
 
+int nLastCheck = 0;
+void static CheckMasterNodeSync()
+{
+    if(GetTime() - nLastCheck < 60)
+        return;
+
+    nLastCheck = GetTime();
+    masternodeChecker.RequestSyncWithPeers();
+}
+
 void static ConnectToMasternodes()
 {
 
@@ -1409,7 +1419,10 @@ void static ConnectToMasternodes()
 
     //if we have tried to connect 5 times, lets consider this mn as invalid
     if(mn->connectAttempts > 5)
+    {
+        printf("ConnectToMasternodes(): tried to connect 5 times, mark invalid\n");
         mn->MarkInvalid(GetTime());
+    }
 
     //connect to this masternode
     CAddress addr;
@@ -1417,6 +1430,7 @@ void static ConnectToMasternodes()
     if(!OpenNetworkConnection(addr, &grant, mn->addr.ToString().c_str()))
     {
         mn->connectAttempts++;
+        printf("ConnectToMasternodes(): failed to open connection\n");
         //AddOneShot(mn->addr.ToString().c_str());
         return;
     }
@@ -1582,6 +1596,10 @@ void ThreadOpenConnections2(void* parg)
 
         if (addrConnect.IsValid())
             OpenNetworkConnection(addrConnect, &grant);
+
+        //keep in sync with masternodes
+        CheckMasterNodeSync();
+        ConnectToMasternodes();
     }
 }
 

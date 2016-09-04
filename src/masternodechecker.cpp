@@ -69,7 +69,11 @@ void CMasternodeChecker::RequestSyncWithPeers()//put this somewhere
 {
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        pnode->PushMessage("mncount");
+        if(pnode->nVersion == PROTOCOL_VERSION)
+        {
+            pnode->PushMessage("mncount");
+            printf("CMasternodeChecker::RequestSyncWithPeers(): sending mn count to %s\n", pnode->addrLocal.ToString().c_str());
+        }
     }
 }
 
@@ -77,6 +81,7 @@ void CMasternodeChecker::SendList(CNode *pnode)
 {
     vector<CMasterNode> vList = GetList();
     pnode->PushMessage("mnlist", vList);
+    printf("CMasternodeChecker::SendList(): sending list to %s\n", pnode->addrLocal.ToString().c_str());
 }
 
 bool CMasternodeChecker::InSync(int nCount)
@@ -94,7 +99,9 @@ CMasterNode* CMasternodeChecker::GetNextPending()
 
 void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv)
 {
-    if(strCommand == "mnprove"){
+    if(strCommand == "mnprove")
+    {
+        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mnprove\n");
         // if we are a masternode, confirm that we are so the peer can verify the list
         if(masternodePayments.IsEnabled())
         {
@@ -111,6 +118,7 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
     }
     else if(strCommand == "mnproof")
     {
+        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mnproof\n");
         vector<unsigned char> vchSig;
         vRecv >> vchSig;
 
@@ -127,30 +135,35 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
         }
 
         if(!fFound || mn->requestedHash == uint256(0))
+        {
+            printf("CMasternodeChecker::ProcessCheckerMessage() mnprove - do not have masternode\n");
             return;
-
+        }
         string errorMessage;
         if(!darkSendSigner.VerifyMessage(mn->pubkey2, vchSig, mn->requestedHash.ToString(), errorMessage))
         {
             //this masternode failed our verification test, this is not a valid masternode
-
-            masternodeChecker.Reject(mn, pfrom);
+            printf("CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode verify failed mark invalid\n");
+            Reject(mn, pfrom);
             return;
         }
 
         //this mn passed the test, mark as valid
-        masternodeChecker.Accept(mn, pfrom);
+        Accept(mn, pfrom);
+        printf("CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode is valid\n");
     }
     else if(strCommand == "mncount")
     {
+        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mncount\n");
         pfrom->PushMessage("mncounted", masternodeChecker.GetMasternodeCount());
     }
     else if(strCommand == "mncounted")
     {
+        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mncounter\n");
         int nCount = 0;
         vRecv >> nCount;
 
-        if(!masternodeChecker.InSync(nCount))
-            masternodeChecker.SendList(pfrom);
+        if(!InSync(nCount))
+            SendList(pfrom);
     }
 }
