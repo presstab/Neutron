@@ -112,6 +112,18 @@ public:
         checkTime = 0;
     }
 
+    IMPLEMENT_SERIALIZE
+    (
+        READWRITE(addr);
+        READWRITE(vin);
+        READWRITE(pubkey);
+        READWRITE(pubkey2);
+        READWRITE(sig);
+        READWRITE(now);
+        READWRITE(lastTimeSeen);
+        READWRITE(protocolVersion);
+    )
+
     void MarkValid(int64_t nTime)
     {
         valid = true;

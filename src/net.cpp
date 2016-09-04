@@ -1409,7 +1409,7 @@ void static ConnectToMasternodes()
 
     //if we have tried to connect 5 times, lets consider this mn as invalid
     if(mn->connectAttempts > 5)
-        masternodeChecker.Reject(mn);
+        mn->MarkInvalid(GetTime());
 
     //connect to this masternode
     CAddress addr;
@@ -1417,7 +1417,7 @@ void static ConnectToMasternodes()
     if(!OpenNetworkConnection(addr, &grant, mn->addr.ToString().c_str()))
     {
         mn->connectAttempts++;
-        AddOneShot(mn->addr.ToString().c_str());
+        //AddOneShot(mn->addr.ToString().c_str());
         return;
     }
 

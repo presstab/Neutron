@@ -28,11 +28,11 @@ class COutPoint;
 class CAddress;
 class CInv;
 class CRequestTracker;
-class CNode;
-class CMasternodeChecker;
 
 class CTxIn;
 class CTxMemPool;
+class CNode;
+class CMasternodeChecker;
 
 #define START_MASTERNODE_PAYMENTS_TESTNET 1432123200 
 #define START_MASTERNODE_PAYMENTS 1432123200 

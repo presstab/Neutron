@@ -5,6 +5,8 @@
 
 #include "alert.h"
 #include "checkpoints.h"
+#include "masternode.h"
+#include "masternodechecker.h"
 #include "db.h"
 #include "txdb.h"
 #include "net.h"
@@ -16,8 +18,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include "darksend.h"
-#include "masternode.h"
-#include "masternodechecker.h"
 #include "spork.h"
 
 #include <stdio.h>
@@ -40,7 +40,6 @@ unsigned int nTransactionsUpdated = 0;
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 libzerocoin::Params* ZCParams;
-CMasternodeChecker masternodeChecker;
 
 CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); // Starting Difficulty: results with 0,000244140625 proof-of-work difficulty
 CBigNum bnProofOfStakeLimit(~uint256(0) >> 20);
@@ -87,6 +86,7 @@ int64_t nReserveBalance = 0;
 int64_t nMinimumInputValue = 0;
 
 extern enum Checkpoints::CPMode CheckpointsMode;
+CMasternodeChecker masternodeChecker;
 
 //////////////////////////////////////////////////////////////////////////////
 //

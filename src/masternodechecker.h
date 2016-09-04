@@ -3,60 +3,29 @@
 
 #endif // MASTERNODECHECKER
 
+#include "masternode.h"
 #include "main.h"
 #include "net.h"
 
 using namespace std;
-class CMasterNode;
 
 class CMasternodeChecker
 {
-private:
-    bool fSynced;
-    map<CTxIn, CMasterNode*> mapAccepted;
-    map<CTxIn, CMasterNode*> mapPending;
-    map<CTxIn, CMasterNode*> mapRejected;
-    map<CTxIn, CMasterNode*> mapTemp;
-
-    void StatusAccepted(CMasterNode* mn)
-    {
-        vAccepted.push_back(mn);
-
-        map<CTxIn, CMasterNode*>::iterator it = find(mapPending.begin(), mapPending.end(), mn);
-        assert(it != mapPending.end());
-        mapPending.erase(it);
-    }
-
-    bool AlreadyHave(CMasterNode* mn)
-    {
-        if(mapPending.count(mn.vin))
-            return true;
-
-        if(mapAccepted.count(mn.vin))
-            return true;
-
-        if(mapRejected.count(mn.vin))
-            return true;
-
-        return false;
-    }
-
 public:
     CMasternodeChecker()
     {
         fSynced = false;
-        vAccepted.clear();
+        mapAccepted.clear();
         mapPending.clear();
-        vRejected.clear();
+        mapRejected.clear();
     }
 
     void AddMasternode(CMasterNode* mn);
-
-    void Reject(CMasterNode* mn);
-
+    void Reject(CMasterNode* mn, CNode* pnode);
     void SendVerifyRequest(CMasterNode* mn, CNode* pnode);
-
-    void Accept(CMasterNode* mn);
+    void Accept(CMasterNode* mn, CNode* pnode);
+    void RequestSyncWithPeers();
+    void SendList(CNode* pnode);
 
     int GetPendingCount()
     {
@@ -68,5 +37,48 @@ public:
         return mapAccepted.size() + mapPending.size();
     }
 
+    bool InSync(int nCount);
+
     CMasterNode* GetNextPending();
+
+    vector<CMasterNode> GetList()
+    {
+        vector<CMasterNode> vList;
+        for(map<string, CMasterNode*>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
+            vList.push_back(*(*it).second);
+
+        for(map<string, CMasterNode*>::iterator it = mapPending.begin(); it != mapPending.end(); it++)
+            vList.push_back(*(*it).second);
+
+        return vList;
+    }
+
+private:
+    bool fSynced;
+    map<string, CMasterNode*> mapAccepted;
+    map<string, CMasterNode*> mapPending;
+    map<string, CMasterNode*> mapRejected;
+    map<string, CMasterNode*> mapTemp;
+
+    void StatusAccepted(CMasterNode* mn)
+    {
+        mapAccepted[mn->vin.prevout.ToString()] = mn;
+
+        if(mapPending.count(mn->vin.prevout.ToString()))
+            mapPending.erase(mn->vin.prevout.ToString());
+    }
+
+    bool AlreadyHave(CMasterNode* mn)
+    {
+        if(mapPending.count(mn->vin.prevout.ToString()))
+            return true;
+
+        if(mapAccepted.count(mn->vin.prevout.ToString()))
+            return true;
+
+        if(mapRejected.count(mn->vin.prevout.ToString()))
+            return true;
+
+        return false;
+    }
 };

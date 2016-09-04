@@ -2,14 +2,15 @@
 #include "activemasternode.h"
 #include "darksend.h"
 //#include "primitives/transaction.h"
-#include "main.h"
 #include "masternodechecker.h"
+#include "main.h"
 #include "util.h"
 #include "addrman.h"
 #include <boost/lexical_cast.hpp>
 
 
 int CMasterNode::minProtoVersion = MIN_MN_PROTO_VERSION;
+extern CMasternodeChecker masternodeChecker;
 
 CCriticalSection cs_masternodes;
 
@@ -415,12 +416,25 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
         if(!darkSendSigner.VerifyMessage(mn->pubkey2, vchSig, mn->requestedHash.ToString(), errorMessage))
         {
             //this masternode failed our verification test, this is not a valid masternode
-            mn->MarkInvalid(GetTime());
+
+            masternodeChecker.Reject(mn, pfrom);
             return;
         }
 
         //this mn passed the test, mark as valid
         masternodeChecker.Accept(mn, pfrom);
+    }
+    else if(strCommand == "mncount")
+    {
+        pfrom->PushMessage("mncounted", masternodeChecker.GetMasternodeCount());
+    }
+    else if(strCommand == "mncounted")
+    {
+        int nCount = 0;
+        vRecv >> nCount;
+
+        if(!masternodeChecker.InSync(nCount))
+            masternodeChecker.SendList(pfrom);
     }
 }
 

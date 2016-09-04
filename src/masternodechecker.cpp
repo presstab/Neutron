@@ -1,13 +1,12 @@
 #include "masternodechecker.h"
 #include "masternode.h"
-#include "main.h"
 
 void CMasternodeChecker::AddMasternode(CMasterNode* mn)
 {
     if(AlreadyHave(mn))
         return;
 
-    mapPending[mn->vin] = mn;
+    mapPending[mn->vin.prevout.ToString()] = mn;
 
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
@@ -20,32 +19,38 @@ void CMasternodeChecker::AddMasternode(CMasterNode* mn)
     }
 
     //we dont have this peer so mark as a temporary connection
-    mapTemp[mn->vin] = mn;
+    mapTemp[mn->vin.prevout.ToString()] = mn;
 }
 
-void CMasternodeChecker::Reject(CMasterNode* mn)
+void CMasternodeChecker::Accept(CMasterNode* mn, CNode* pnode)
 {
-    map<CTxin, CMasterNode*>::iterator it = find(mapPending.begin(), mapPending.end(), mn->vin);
-    if(it != mapPending.end())
-        mapPending.erase(it);
+    mn->MarkValid(GetTime());
+    StatusAccepted(mn);
 
-    mapRejected[mn->vin] = mn;
-
-    //disconnect from peer if we marked this as a temporary peer
-    if(mapTemp.count(mn->vin))
+    if(mapTemp.count(mn->vin.prevout.ToString()))
     {
         pnode->CloseSocketDisconnect();
-        mapTemp.erase(mn->vin);
-        printf("CMasternodeChecker::Reject closing connection with peer because mn failed\n");
+        mapTemp.erase(mn->vin.prevout.ToString());
+        printf("CMasternodeChecker::Accept: closing connection with peer because mn verified\n");
     }
 }
 
-CMasterNode* CMasternodeChecker::GetNextPending()
+void CMasternodeChecker::Reject(CMasterNode* mn, CNode* pnode)
 {
-    if(mapPending.empty())
-        return NULL;
+    map<string, CMasterNode*>::iterator it = mapPending.find(mn->vin.prevout.ToString());
+    if(it != mapPending.end())
+        mapPending.erase(it);
 
-    return mapPending.front();
+    mn->MarkInvalid(GetTime());
+    mapRejected[mn->vin.prevout.ToString()] = mn;
+
+    //disconnect from peer if we marked this as a temporary peer
+    if(mapTemp.count(mn->vin.prevout.ToString()))
+    {
+        pnode->CloseSocketDisconnect();
+        mapTemp.erase(mn->vin.prevout.ToString());
+        printf("CMasternodeChecker::Reject closing connection with peer because mn failed\n");
+    }
 }
 
 void CMasternodeChecker::SendVerifyRequest(CMasterNode* mn, CNode* pnode)
@@ -59,15 +64,29 @@ void CMasternodeChecker::SendVerifyRequest(CMasterNode* mn, CNode* pnode)
     pnode->PushMessage("mnprove", hash);
 }
 
-void CMasternodeChecker::Accept(CMasterNode* mn, CNode* pnode)
+void CMasternodeChecker::RequestSyncWithPeers()//put this somewhere
 {
-    mn->MarkValid(GetTime());
-    StatusAccepted(mn);
-
-    if(mapTemp.count(mn->vin))
+    BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        pnode->CloseSocketDisconnect();
-        mapTemp.erase(mn->vin);
-        printf("CMasternodeChecker::Accept: closing connection with peer because mn verified\n");
+        pnode->PushMessage("mncount");
     }
+}
+
+void CMasternodeChecker::SendList(CNode *pnode)
+{
+    vector<CMasterNode> vList = GetList();
+    pnode->PushMessage("mnlist", vList);
+}
+
+bool CMasternodeChecker::InSync(int nCount)
+{
+    return GetMasternodeCount() == nCount;
+}
+
+CMasterNode* CMasternodeChecker::GetNextPending()
+{
+    if(mapPending.empty())
+        return NULL;
+
+    return (*mapPending.begin()).second;
 }
