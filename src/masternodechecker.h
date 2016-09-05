@@ -20,7 +20,8 @@ public:
         mapRejected.clear();
     }
 
-    void AddMasternode(CMasterNode* mn);
+    void AddMasternode(CMasterNode* mn, bool fVerified = false);
+    void ReconcileLists();
     void Reject(CMasterNode* mn, CNode* pnode);
     void SendVerifyRequest(CMasterNode* mn, CNode* pnode);
     void Accept(CMasterNode* mn, CNode* pnode);

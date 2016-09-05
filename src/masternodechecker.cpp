@@ -2,15 +2,22 @@
 #include "masternodechecker.h"
 #include "masternode.h"
 
-void CMasternodeChecker::AddMasternode(CMasterNode* mn)
+void CMasternodeChecker::AddMasternode(CMasterNode* mn, bool fVerified)
 {
     if(AlreadyHave(mn))
         return;
 
+    printf("***CMasternodeChecker::AddMasternode adding mn\n");
     //use a new address in memory
     CMasterNode mnNew = *mn;
 
-    mapPending[mnNew.vin.prevout.ToString()] = &mnNew;
+    if(fVerified)
+    {
+        mapAccepted[mnNew.vin.prevout.ToString()] = &mnNew;
+        return;
+    }
+    else
+        mapPending[mnNew.vin.prevout.ToString()] = &mnNew;
 
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
@@ -26,10 +33,21 @@ void CMasternodeChecker::AddMasternode(CMasterNode* mn)
     mapTemp[mnNew.vin.prevout.ToString()] = &mnNew;
 }
 
+void CMasternodeChecker::ReconcileLists()
+{
+    BOOST_FOREACH(CMasterNode mn, vecMasternodes)
+    {
+        //anything in vecMasternodes has already been checked and should be considered verified
+        //the difference between the two lists is that vecMasternodes are connected peers
+        AddMasternode(&mn, true);
+    }
+}
+
 void CMasternodeChecker::Accept(CMasterNode* mn, CNode* pnode)
 {
     mn->MarkValid(GetTime());
     StatusAccepted(mn);
+     printf("***CMasternodeChecker::Accept Accepted masternode \n");
 
     if(mapTemp.count(mn->vin.prevout.ToString()))
     {
@@ -59,6 +77,7 @@ void CMasternodeChecker::Reject(CMasterNode* mn, CNode* pnode)
 
 void CMasternodeChecker::SendVerifyRequest(CMasterNode* mn, CNode* pnode)
 {
+     printf("***CMasternodeChecker:: Sending verify request to %s", pnode->addr.ToString().c_str());
     //create a hash of non deterministic random vars and ask mn to sign it
     CDataStream ss(SER_GETHASH, 0);
     ss << rand() << GetTime() << GetPendingCount();
@@ -82,9 +101,10 @@ void CMasternodeChecker::RequestSyncWithPeers()//put this somewhere
 
 void CMasternodeChecker::SendList(CNode *pnode)
 {
+    ReconcileLists();
     vector<CMasterNode> vList = GetList();
     pnode->PushMessage("mnlist", vList);
-    printf("CMasternodeChecker::SendList(): sending list to %s\n", pnode->addrLocal.ToString().c_str());
+    printf("***CMasternodeChecker::SendList(): sending list to %s\n", pnode->addr.ToString().c_str());
 }
 
 void CMasternodeChecker::ProcessMasternodeList(vector<CMasterNode> vList)
@@ -110,7 +130,7 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
 {
     if(strCommand == "mnprove")
     {
-        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mnprove\n");
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mnprove\n");
         // if we are a masternode, confirm that we are so the peer can verify the list
         if(masternodePayments.IsEnabled())
         {
@@ -127,7 +147,7 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
     }
     else if(strCommand == "mnproof")
     {
-        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mnproof\n");
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mnproof\n");
         vector<unsigned char> vchSig;
         vRecv >> vchSig;
 
@@ -145,30 +165,30 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
 
         if(!fFound || mn->requestedHash == uint256(0))
         {
-            printf("CMasternodeChecker::ProcessCheckerMessage() mnprove - do not have masternode\n");
+            printf("***CMasternodeChecker::ProcessCheckerMessage() mnprove - do not have masternode\n");
             return;
         }
         string errorMessage;
         if(!darkSendSigner.VerifyMessage(mn->pubkey2, vchSig, mn->requestedHash.ToString(), errorMessage))
         {
             //this masternode failed our verification test, this is not a valid masternode
-            printf("CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode verify failed mark invalid\n");
+            printf("***CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode verify failed mark invalid\n");
             Reject(mn, pfrom);
             return;
         }
 
         //this mn passed the test, mark as valid
         Accept(mn, pfrom);
-        printf("CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode is valid\n");
+        printf("***CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode is valid\n");
     }
     else if(strCommand == "mncount")
     {
-        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mncount\n");
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncount\n");
         pfrom->PushMessage("mncounted", masternodeChecker.GetMasternodeCount());
     }
     else if(strCommand == "mncounted")
     {
-        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mncount of %d\n", GetMasternodeCount());
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncounted of %d\n", GetMasternodeCount());
         int nCount = 0;
         vRecv >> nCount;
 
@@ -177,9 +197,10 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
     }
     else if(strCommand == "mnlist")
     {
-        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mn list from %s\n", pfrom->addrLocal.ToString().c_str());
         vector<CMasterNode> vList;
         vRecv >> vList;
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mn list from %s, size=%d\n", pfrom->addr.ToString().c_str(), vList.size());
+
         ProcessMasternodeList(vList);
     }
 
