@@ -7,20 +7,23 @@ void CMasternodeChecker::AddMasternode(CMasterNode* mn)
     if(AlreadyHave(mn))
         return;
 
-    mapPending[mn->vin.prevout.ToString()] = mn;
+    //use a new address in memory
+    CMasterNode mnNew = *mn;
+
+    mapPending[mnNew.vin.prevout.ToString()] = &mnNew;
 
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
         //check if we have this peer already
-        if(pnode->addrLocal == mn->addr)
+        if(pnode->addrLocal == mnNew.addr)
         {
-            SendVerifyRequest(mn, pnode);
+            SendVerifyRequest(&mnNew, pnode);
             return;
         }
     }
 
     //we dont have this peer so mark as a temporary connection
-    mapTemp[mn->vin.prevout.ToString()] = mn;
+    mapTemp[mnNew.vin.prevout.ToString()] = &mnNew;
 }
 
 void CMasternodeChecker::Accept(CMasterNode* mn, CNode* pnode)
@@ -82,6 +85,12 @@ void CMasternodeChecker::SendList(CNode *pnode)
     vector<CMasterNode> vList = GetList();
     pnode->PushMessage("mnlist", vList);
     printf("CMasternodeChecker::SendList(): sending list to %s\n", pnode->addrLocal.ToString().c_str());
+}
+
+void CMasternodeChecker::ProcessMasternodeList(vector<CMasterNode> vList)
+{
+    BOOST_FOREACH(CMasterNode mn, vList)
+        AddMasternode(&mn);
 }
 
 bool CMasternodeChecker::InSync(int nCount)
@@ -159,11 +168,78 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
     }
     else if(strCommand == "mncounted")
     {
-        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mncounter\n");
+        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mncount of %d\n", GetMasternodeCount());
         int nCount = 0;
         vRecv >> nCount;
 
-        if(!InSync(nCount))
+        //if(!InSync(nCount))
             SendList(pfrom);
     }
+    else if(strCommand == "mnlist")
+    {
+        printf("CMasternodeChecker::ProcessCheckerMessage() recieved mn list from %s\n", pfrom->addrLocal.ToString().c_str());
+        vector<CMasterNode> vList;
+        vRecv >> vList;
+        ProcessMasternodeList(vList);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }

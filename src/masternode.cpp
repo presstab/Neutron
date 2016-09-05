@@ -749,7 +749,7 @@ uint64_t CMasternodePayments::CalculateScore(uint256 blockHash, CTxIn& vin)
 bool CMasternodePayments::GetBlockPayee(int nBlockHeight, CScript& payee)
 {
     //This will recalculate the masternode list each time GetBlockPayee is called
-    PopulateMasterNodeWinningList();
+    //PopulateMasterNodeWinningList();
 	
 	BOOST_FOREACH(CMasternodePaymentWinner& winner, vWinning){
         if(winner.nBlockHeight == nBlockHeight) {

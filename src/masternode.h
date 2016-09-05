@@ -89,6 +89,22 @@ public:
     //the dsq count from the last dsq broadcast of this node
     int64_t nLastDsq;
 
+    CMasterNode()
+    {
+        enabled = 1;
+        lastTimeSeen = 0;
+        unitTest = false;
+        cacheInputAge = 0;
+        cacheInputAgeBlock = 0;
+        nLastDsq = 0;
+        lastDseep = 0;
+        allowFreeTx = true;
+        connectAttempts = 0;
+        valid = true; //assume valid unless something triggers otherwise
+        requestedHash = uint256(0);
+        checkTime = 0;
+    }
+
     CMasterNode(CService newAddr, CTxIn newVin, CPubKey newPubkey, std::vector<unsigned char> newSig, int64_t newNow, CPubKey newPubkey2, int protocolVersionIn)
     {
         addr = newAddr;
