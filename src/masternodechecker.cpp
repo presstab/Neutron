@@ -22,7 +22,7 @@ void CMasternodeChecker::AddMasternode(CMasterNode* mn, bool fVerified)
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
         //check if we have this peer already
-        if(pnode->addrLocal == mnNew.addr)
+        if(pnode->addr == mnNew.addr)
         {
             SendVerifyRequest(&mnNew, pnode);
             return;
@@ -103,14 +103,10 @@ void CMasternodeChecker::SendList(CNode *pnode)
 {
     ReconcileLists();
     vector<CMasterNode> vList = GetList();
-    pnode->PushMessage("mnlist", vList);
-    printf("***CMasternodeChecker::SendList(): sending list to %s\n", pnode->addr.ToString().c_str());
-}
-
-void CMasternodeChecker::ProcessMasternodeList(vector<CMasterNode> vList)
-{
     BOOST_FOREACH(CMasterNode mn, vList)
-        AddMasternode(&mn);
+        pnode->PushMessage("mnfromlist", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, mn.lastTimeSeen, mn.protocolVersion);
+
+    printf("***CMasternodeChecker::SendList(): sending list to %s\n", pnode->addr.ToString().c_str());
 }
 
 bool CMasternodeChecker::InSync(int nCount)
@@ -195,13 +191,22 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
         //if(!InSync(nCount))
             SendList(pfrom);
     }
-    else if(strCommand == "mnlist")
+    else if(strCommand == "mnfromlist")
     {
-        vector<CMasterNode> vList;
-        vRecv >> vList;
-        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mn list from %s, size=%d\n", pfrom->addr.ToString().c_str(), vList.size());
+        CTxIn vin;
+        CService addr;
+        CPubKey pubkey;
+        CPubKey pubkey2;
+        vector<unsigned char> vchSig;
+        int64_t sigTime;
+        int64_t lastUpdated;
+        int protocolVersion;
 
-        ProcessMasternodeList(vList);
+        vRecv >> vin >> addr >> vchSig >> sigTime >> pubkey >> pubkey2 >> lastUpdated >> protocolVersion;
+        CMasterNode mn(addr, vin, pubkey, vchSig, sigTime, pubkey2, protocolVersion);
+
+        AddMasternode(&mn);
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mn list from %s, size=%d\n", pfrom->addr.ToString().c_str());
     }
 
 
