@@ -8,29 +8,27 @@ void CMasternodeChecker::AddMasternode(CMasterNode* mn, bool fVerified)
         return;
 
     printf("***CMasternodeChecker::AddMasternode adding mn\n");
-    //use a new address in memory
-    CMasterNode mnNew = *mn;
 
     if(fVerified)
     {
-        mapAccepted[mnNew.vin.prevout.ToString()] = &mnNew;
+        mapAccepted[mn->vin.prevout.ToString()] = *mn;
         return;
     }
     else
-        mapPending[mnNew.vin.prevout.ToString()] = &mnNew;
+        mapPending[mn->vin.prevout.ToString()] = *mn;
 
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
         //check if we have this peer already
-        if(pnode->addr == mnNew.addr)
+        if(pnode->addr == mn->addr)
         {
-            SendVerifyRequest(&mnNew, pnode);
+            SendVerifyRequest(mn, pnode);
             return;
         }
     }
 
     //we dont have this peer so mark as a temporary connection
-    mapTemp[mnNew.vin.prevout.ToString()] = &mnNew;
+    mapTemp[mn->vin.prevout.ToString()] = *mn;
 }
 
 void CMasternodeChecker::ReconcileLists()
@@ -59,12 +57,12 @@ void CMasternodeChecker::Accept(CMasterNode* mn, CNode* pnode)
 
 void CMasternodeChecker::Reject(CMasterNode* mn, CNode* pnode)
 {
-    map<string, CMasterNode*>::iterator it = mapPending.find(mn->vin.prevout.ToString());
+    map<string, CMasterNode>::iterator it = mapPending.find(mn->vin.prevout.ToString());
     if(it != mapPending.end())
         mapPending.erase(it);
 
     mn->MarkInvalid(GetTime());
-    mapRejected[mn->vin.prevout.ToString()] = mn;
+    mapRejected[mn->vin.prevout.ToString()] = *mn;
 
     //disconnect from peer if we marked this as a temporary peer
     if(mapTemp.count(mn->vin.prevout.ToString()))
@@ -119,7 +117,7 @@ CMasterNode* CMasternodeChecker::GetNextPending()
     if(mapPending.empty())
         return NULL;
 
-    return (*mapPending.begin()).second;
+    return &(*mapPending.begin()).second;
 }
 
 void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv)

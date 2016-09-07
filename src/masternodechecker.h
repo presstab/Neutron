@@ -46,25 +46,25 @@ public:
     vector<CMasterNode> GetList()
     {
         vector<CMasterNode> vList;
-        for(map<string, CMasterNode*>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
-            vList.push_back(*(*it).second);
+        for(map<string, CMasterNode>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
+            vList.push_back((*it).second);
 
-        for(map<string, CMasterNode*>::iterator it = mapPending.begin(); it != mapPending.end(); it++)
-            vList.push_back(*(*it).second);
+        for(map<string, CMasterNode>::iterator it = mapPending.begin(); it != mapPending.end(); it++)
+            vList.push_back((*it).second);
 
         return vList;
     }
 
 private:
     bool fSynced;
-    map<string, CMasterNode*> mapAccepted;
-    map<string, CMasterNode*> mapPending;
-    map<string, CMasterNode*> mapRejected;
-    map<string, CMasterNode*> mapTemp;
+    map<string, CMasterNode> mapAccepted;
+    map<string, CMasterNode> mapPending;
+    map<string, CMasterNode> mapRejected;
+    map<string, CMasterNode> mapTemp;
 
     void StatusAccepted(CMasterNode* mn)
     {
-        mapAccepted[mn->vin.prevout.ToString()] = mn;
+        mapAccepted[mn->vin.prevout.ToString()] = *mn;
 
         if(mapPending.count(mn->vin.prevout.ToString()))
             mapPending.erase(mn->vin.prevout.ToString());
