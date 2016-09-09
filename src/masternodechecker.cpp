@@ -100,10 +100,18 @@ void CMasternodeChecker::RequestSyncWithPeers()//put this somewhere
 void CMasternodeChecker::SendList(CNode *pnode)
 {
     ReconcileLists();
-    vector<CMasterNode> vList = GetList();
-    BOOST_FOREACH(CMasterNode mn, vList)
-        pnode->PushMessage("mnfromlist", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, mn.lastTimeSeen, mn.protocolVersion);
 
+    for(map<string, CMasterNode>::iterator it = mapPending.begin(); it != mapPending.end(); it++)
+    {
+        CMasterNode mn = (*it).second;
+        pnode->PushMessage("mnfromlist", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, mn.lastTimeSeen, mn.protocolVersion);
+    }
+
+    for(map<string, CMasterNode>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
+    {
+        CMasterNode mn = (*it).second;
+        pnode->PushMessage("mnfromlist", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, mn.lastTimeSeen, mn.protocolVersion);
+    }
     printf("***CMasternodeChecker::SendList(): sending list to %s\n", pnode->addr.ToString().c_str());
 }
 
@@ -150,7 +158,7 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
         bool fFound = false;
         BOOST_FOREACH(CMasterNode m, vecMasternodes)
         {
-            if(m.addr == pfrom->addrLocal) //note need to double check this logic
+            if(m.addr == pfrom->addr) //note need to double check this logic
             {
                 mn = &m;
                 fFound = true;
