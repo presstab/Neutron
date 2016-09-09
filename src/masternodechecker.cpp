@@ -75,7 +75,7 @@ void CMasternodeChecker::Reject(CMasterNode* mn, CNode* pnode)
 
 void CMasternodeChecker::SendVerifyRequest(CMasterNode* mn, CNode* pnode)
 {
-     printf("***CMasternodeChecker:: Sending verify request to %s", pnode->addr.ToString().c_str());
+     printf("***CMasternodeChecker:: Sending verify request to %s \n", pnode->addr.ToString().c_str());
     //create a hash of non deterministic random vars and ask mn to sign it
     CDataStream ss(SER_GETHASH, 0);
     ss << rand() << GetTime() << GetPendingCount();
