@@ -1433,7 +1433,7 @@ void static ConnectToMasternodes()
     bool fSent = false;
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        if(pnode->addr == mn->addr)
+        if(pnode->nVersion >= MIN_PEER_PROTO_VERSION && pnode->addr == mn->addr)
         {
             printf("***ConnectToMasternodes(): checking node %s \n", pnode->addr.ToString().c_str());
             masternodeChecker.SendVerifyRequest(mn, pnode);
