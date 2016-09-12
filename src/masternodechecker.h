@@ -21,7 +21,6 @@ public:
     }
 
     void AddMasternode(CMasterNode* mn, bool fVerified = false);
-    void ReconcileLists();
     void SendVerifyRequest(CMasterNode* mn, CNode* pnode);
     void Accept(CMasterNode* mn, CNode* pnode);
     void Reject(CMasterNode* mn);

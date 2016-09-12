@@ -12,6 +12,9 @@ void CMasternodeChecker::AddMasternode(CMasterNode* mn, bool fVerified)
     if(fVerified)
     {
         mapAccepted[mn->vin.prevout.ToString()] = *mn;
+
+        //this is redundant, ultimately it would be best to refactor legacy code
+        vecMasternodes.push_back(*mn);
         return;
     }
     else
@@ -26,16 +29,6 @@ void CMasternodeChecker::AddMasternode(CMasterNode* mn, bool fVerified)
 
     //we dont have this peer so mark as a temporary connection
     mapTemp[mn->vin.prevout.ToString()] = *mn;
-}
-
-void CMasternodeChecker::ReconcileLists()
-{
-    BOOST_FOREACH(CMasterNode mn, vecMasternodes)
-    {
-        //anything in vecMasternodes has already been checked and should be considered verified
-        //the difference between the two lists is that vecMasternodes are connected peers
-        AddMasternode(&mn, true);
-    }
 }
 
 void CMasternodeChecker::Accept(CMasterNode* mn, CNode* pnode)

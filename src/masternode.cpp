@@ -173,10 +173,12 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
             // use this as a peer
             addrman.Add(CAddress(addr), pfrom->addr, 2*60*60);
 
-            // add our masternode
+            // add our masternode to our pending list for further approval
             CMasterNode mn(addr, vin, pubkey, vchSig, sigTime, pubkey2, protocolVersion);
             mn.UpdateLastSeen(lastUpdated);
-            vecMasternodes.push_back(mn);
+
+            //right now we will consider this verified - after fork time this will need to add to the pending list (remove true flag)
+            masternodeChecker.AddMasternode(&mn, true);
 
             // if it matches our masternodeprivkey, then we've been remotely activated
             if(pubkey2 == activeMasternode.pubKeyMasternode && protocolVersion == PROTOCOL_VERSION){
