@@ -52,15 +52,24 @@ void CMasternodeChecker::Accept(CMasterNode* mn, CNode* pnode)
     }
 }
 
-void CMasternodeChecker::Reject(CMasterNode* mn, CNode* pnode)
+void CMasternodeChecker::Reject(CMasterNode* mn)
 {
+    mn->MarkInvalid(GetTime());
+    mapRejected[mn->vin.prevout.ToString()] = *mn;
+
     map<string, CMasterNode>::iterator it = mapPending.find(mn->vin.prevout.ToString());
     if(it != mapPending.end())
         mapPending.erase(it);
 
-    mn->MarkInvalid(GetTime());
-    mapRejected[mn->vin.prevout.ToString()] = *mn;
+    printf("*** CMasternodeChecker::Rejected mn at %s : Accepted=%d Pending=%d Rejected=%d\n",
+           ((CAddress)mn->addr).ToString().c_str(),
+           mapAccepted.size(),
+           mapPending.size(),
+           mapRejected.size());
+}
 
+void CMasternodeChecker::Reject(CMasterNode* mn, CNode* pnode)
+{
     //disconnect from peer if we marked this as a temporary peer
     if(mapTemp.count(mn->vin.prevout.ToString()))
     {
@@ -68,6 +77,8 @@ void CMasternodeChecker::Reject(CMasterNode* mn, CNode* pnode)
         mapTemp.erase(mn->vin.prevout.ToString());
         printf("CMasternodeChecker::Reject closing connection with peer because mn failed\n");
     }
+
+    Reject(mn);
 }
 
 void CMasternodeChecker::SendVerifyRequest(CMasterNode* mn, CNode* pnode)
@@ -94,11 +105,11 @@ void CMasternodeChecker::RequestSyncWithPeers()//accessed in net.cpp
 {
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        if(pnode->nVersion == PROTOCOL_VERSION)
-        {
+        //if(pnode->nVersion == PROTOCOL_VERSION)
+       // {
             pnode->PushMessage("mncount");
-            printf("CMasternodeChecker::RequestSyncWithPeers(): sending mn count to %s\n", pnode->addrLocal.ToString().c_str());
-        }
+            printf("CMasternodeChecker::RequestSyncWithPeers(): requesting mncount from %s\n", pnode->addr.ToString().c_str());
+        //}
     }
 }
 
@@ -117,7 +128,7 @@ void CMasternodeChecker::SendList(CNode *pnode)
         CMasterNode mn = (*it).second;
         pnode->PushMessage("mnfromlist", mn.vin, mn.addr, mn.sig, mn.now, mn.pubkey, mn.pubkey2, mn.lastTimeSeen, mn.protocolVersion);
     }
-    printf("***CMasternodeChecker::SendList(): sending list to %s\n", pnode->addr.ToString().c_str());
+    printf("***CMasternodeChecker::SendList(): sending list to %s - Accepted=%d Pending=%d\n", pnode->addr.ToString().c_str(), mapAccepted.size(), mapPending.size());
 }
 
 bool CMasternodeChecker::InSync(int nCount)
@@ -218,14 +229,14 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
     }
     else if(strCommand == "mncount")
     {
-        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncount\n");
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncount, sending back count of %d\n", masternodeChecker.GetMasternodeCount());
         pfrom->PushMessage("mncounted", masternodeChecker.GetMasternodeCount());
     }
     else if(strCommand == "mncounted")
     {
-        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncounted of %d\n", GetMasternodeCount());
         int nCount = 0;
         vRecv >> nCount;
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncounted of %d\n", nCount);
 
         //if(!InSync(nCount))
             SendList(pfrom);

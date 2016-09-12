@@ -1411,7 +1411,6 @@ void static CheckMasterNodeSync()
 
 void static ConnectToMasternodes()
 {
-    printf("***ConnectToMasternodes(): start \n");
     if(!masternodeChecker.GetPendingCount())
         return;
 
@@ -1422,14 +1421,14 @@ void static ConnectToMasternodes()
     {
         printf("***ConnectToMasternodes(): tried to connect 5 times, mark invalid\n");
         mn->MarkInvalid(GetTime());
+        masternodeChecker.Reject(mn);
     }
+
     printf("***ConnectToMasternodes(): try to connect to %s\n", mn->addr.ToString().c_str());
     ConnectNode((CAddress)mn->addr, mn->addr.ToString().c_str(), true);
-
     MilliSleep(500);
 
     LOCK(cs_vNodes);
-
     bool fSent = false;
     BOOST_FOREACH(CNode* pnode, vNodes)
     {

@@ -22,9 +22,10 @@ public:
 
     void AddMasternode(CMasterNode* mn, bool fVerified = false);
     void ReconcileLists();
-    void Reject(CMasterNode* mn, CNode* pnode);
     void SendVerifyRequest(CMasterNode* mn, CNode* pnode);
     void Accept(CMasterNode* mn, CNode* pnode);
+    void Reject(CMasterNode* mn);
+    void Reject(CMasterNode* mn, CNode* pnode);
     void RequestSyncWithPeers();
     void SendList(CNode* pnode);
     void ProcessCheckerMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
