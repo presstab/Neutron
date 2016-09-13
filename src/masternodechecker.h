@@ -20,6 +20,7 @@ public:
         mapRejected.clear();
     }
 
+    bool Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pubkey, CPubKey pubkey2, vector<unsigned char> vchSig, int64_t sigTime ,int64_t lastUpdated, int protocolVersion);
     void AddMasternode(CMasterNode* mn, bool fVerified = false);
     void SendVerifyRequest(CMasterNode* mn, CNode* pnode);
     void Accept(CMasterNode* mn, CNode* pnode);
@@ -43,18 +44,6 @@ public:
 
     CMasterNode* GetNextPending();
 
-    vector<CMasterNode> GetList()
-    {
-        vector<CMasterNode> vList;
-        for(map<string, CMasterNode>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
-            vList.push_back((*it).second);
-
-        for(map<string, CMasterNode>::iterator it = mapPending.begin(); it != mapPending.end(); it++)
-            vList.push_back((*it).second);
-
-        return vList;
-    }
-
 private:
     bool fSynced;
     map<string, CMasterNode> mapAccepted;
@@ -70,17 +59,36 @@ private:
             mapPending.erase(mn->vin.prevout.ToString());
     }
 
-    bool AlreadyHave(CMasterNode* mn)
+    bool AlreadyHave(std::string strVin)
     {
-        if(mapPending.count(mn->vin.prevout.ToString()))
+        if(mapPending.count(strVin))
             return true;
 
-        if(mapAccepted.count(mn->vin.prevout.ToString()))
+        if(mapAccepted.count(strVin))
             return true;
 
-        if(mapRejected.count(mn->vin.prevout.ToString()))
+        if(mapRejected.count(strVin))
             return true;
 
         return false;
+    }
+
+    bool AlreadyHave(CMasterNode* mn)
+    {
+        return AlreadyHave(mn->vin.prevout.ToString());
+    }
+
+    bool Get(std::string strVin, CMasterNode* mn)
+    {
+        if(mapPending.count(strVin))
+            mn = &mapPending[strVin];
+        else if(mapAccepted.count(strVin))
+            mn = &mapAccepted[strVin];
+        else if(mapRejected.count(strVin))
+            mn = &mapRejected[strVin];
+        else
+            return false;
+
+        return true;
     }
 };

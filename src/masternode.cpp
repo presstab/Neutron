@@ -47,11 +47,11 @@ void ProcessMasternodeConnections(){
 
 void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream& vRecv)
 {
-    if (strCommand == "dsee") { //DarkSend Election Entry
-        if(fLiteMode) return; //disable all darksend/masternode related functionality
-
-        bool fIsInitialDownload = IsInitialBlockDownload();
-        if(fIsInitialDownload) return;
+    if (strCommand == "dsee") 
+    { 
+    	//DarkSend Election Entry
+        if(fLiteMode || IsInitialBlockDownload()) 
+        	return; //disable all darksend/masternode related functionality
 
         CTxIn vin;
         CService addr;
@@ -68,138 +68,8 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
         // 70047 and greater
         vRecv >> vin >> addr >> vchSig >> sigTime >> pubkey >> pubkey2 >> count >> current >> lastUpdated >> protocolVersion;
 
-        // make sure signature isn't in the future (past is OK)
-        if (sigTime > GetAdjustedTime() + 60 * 60) {
-            printf("dsee - Signature rejected, too far into the future %s\n", vin.ToString().c_str());
-            return;
-        }
-
-        bool isLocal = addr.IsRFC1918() || addr.IsLocal();
-        //if(Params().MineBlocksOnDemand()) isLocal = false;
-
-        std::string vchPubKey(pubkey.vchPubKey.begin(), pubkey.vchPubKey.end());
-        std::string vchPubKey2(pubkey2.vchPubKey.begin(), pubkey2.vchPubKey.end());
-
-        strMessage = addr.ToString() + boost::lexical_cast<std::string>(sigTime) + vchPubKey + vchPubKey2 + boost::lexical_cast<std::string>(protocolVersion);
-
-        if(protocolVersion < MIN_MN_PROTO_VERSION) {
-            printf("dsee - ignoring outdated masternode %s protocol version %d\n", vin.ToString().c_str(), protocolVersion);
-            return;
-        }
-
-        CScript pubkeyScript;
-        pubkeyScript =GetScriptForDestination(pubkey.GetID());
-
-        if(pubkeyScript.size() != 25) {
-            printf("dsee - pubkey the wrong size\n");
-            pfrom->Misbehaving(100);
-            return;
-        }
-
-        CScript pubkeyScript2;
-        pubkeyScript2 =GetScriptForDestination(pubkey2.GetID());
-
-        if(pubkeyScript2.size() != 25) {
-            printf("dsee - pubkey2 the wrong size\n");
-            pfrom->Misbehaving(100);
-            return;
-        }
-
-        std::string errorMessage = "";
-        if(!darkSendSigner.VerifyMessage(pubkey, vchSig, strMessage, errorMessage)){
-            printf("dsee - Got bad masternode address signature\n");
-            pfrom->Misbehaving(100);
-            return;
-        }
-
-        
-
-        //search existing masternode list, this is where we update existing masternodes with new dsee broadcasts
-	LOCK(cs_masternodes);
-        BOOST_FOREACH(CMasterNode& mn, vecMasternodes) {
-            if(mn.vin.prevout == vin.prevout) {
-                // count == -1 when it's a new entry
-                //   e.g. We don't want the entry relayed/time updated when we're syncing the list
-                // mn.pubkey = pubkey, IsVinAssociatedWithPubkey is validated once below,
-                //   after that they just need to match
-                if(count == -1 && mn.pubkey == pubkey && !mn.UpdatedWithin(MASTERNODE_MIN_DSEE_SECONDS)){
-                    mn.UpdateLastSeen();
-
-                    if(mn.now < sigTime){ //take the newest entry
-                        printf("dsee - Got updated entry for %s\n", addr.ToString().c_str());
-                        mn.pubkey2 = pubkey2;
-                        mn.now = sigTime;
-                        mn.sig = vchSig;
-                        mn.protocolVersion = protocolVersion;
-                        mn.addr = addr;
-
-                        RelayDarkSendElectionEntry(vin, addr, vchSig, sigTime, pubkey, pubkey2, count, current, lastUpdated, protocolVersion);
-                    }
-                }
-
-                return;
-            }
-        }
-
-        // make sure the vout that was signed is related to the transaction that spawned the masternode
-        //  - this is expensive, so it's only done once per masternode
-        if(!darkSendSigner.IsVinAssociatedWithPubkey(vin, pubkey)) {
-            printf("dsee - Got mismatched pubkey and vin\n");
-            pfrom->Misbehaving(100);
-            return;
-        }
-
-        if(fDebug) printf("dsee - Got NEW masternode entry %s\n", addr.ToString().c_str());
-
-        // make sure it's still unspent
-        //  - this is checked later by .check() in many places and by ThreadCheckDarkSendPool()
-
-
-        CTransaction tx = CTransaction();
-        CTxOut vout = CTxOut(24999*COIN, darkSendPool.collateralPubKey);
-        tx.vin.push_back(vin);
-        tx.vout.push_back(vout);
-        //if(AcceptableInputs(mempool, state, tx)){
-	bool* pfMissingInputs = false;
-	if(AcceptableInputs(mempool, tx, false, pfMissingInputs)){
-            if(fDebug) printf("dsee - Accepted masternode entry %i %i\n", count, current);
-
-            if(GetInputAge(vin) < MASTERNODE_MIN_CONFIRMATIONS){
-                printf("dsee - Input must have least %d confirmations\n", MASTERNODE_MIN_CONFIRMATIONS);
-                pfrom->Misbehaving(20);
-                return;
-            }
-
-            // use this as a peer
-            addrman.Add(CAddress(addr), pfrom->addr, 2*60*60);
-
-            // add our masternode to our pending list for further approval
-            CMasterNode mn(addr, vin, pubkey, vchSig, sigTime, pubkey2, protocolVersion);
-            mn.UpdateLastSeen(lastUpdated);
-
-            //right now we will consider this verified - after fork time this will need to add to the pending list (remove true flag)
-            masternodeChecker.AddMasternode(&mn, true);
-
-            // if it matches our masternodeprivkey, then we've been remotely activated
-            if(pubkey2 == activeMasternode.pubKeyMasternode && protocolVersion == PROTOCOL_VERSION){
-                activeMasternode.EnableHotColdMasterNode(vin, addr);
-            }
-
-            if(count == -1 && !isLocal)
-                RelayDarkSendElectionEntry(vin, addr, vchSig, sigTime, pubkey, pubkey2, count, current, lastUpdated, protocolVersion);
-
-        } else {
-            printf("dsee - Rejected masternode entry %s\n", addr.ToString().c_str());
-
-            int nDoS = 0;
-           /* if (state.IsInvalid(nDoS))
-            {
-                printf("dsee - %s from %s %s was not accepted into the memory pool\n", tx.GetHash().ToString().c_str(),
-                    pfrom->addr.ToString().c_str(), pfrom->cleanSubVer.c_str());
-                if (nDoS > 0)
-                    pfrom->Misbehaving(nDoS);
-            }*/
-        }
+        if(!masternodeChecker.Dsee(pfrom, vin, addr, pubkey, pubkey2, vchSig, sigTime, lastUpdated, protocolVersion))
+            printf("dsee - Rejected new masternode entry %s\n", addr.ToString().c_str());
     }
 
     else if (strCommand == "dseep") { //DarkSend Election Entry Ping
