@@ -14,7 +14,6 @@ class CMasternodeChecker
 public:
     CMasternodeChecker()
     {
-        fSynced = false;
         mapAccepted.clear();
         mapPending.clear();
         mapRejected.clear();
@@ -30,6 +29,11 @@ public:
     void RequestSyncWithPeers();
     void SendList(CNode* pnode);
     void ProcessCheckerMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
+    bool Synced()
+    {
+        return mapAccepted.size() > 1 && mapPending.empty();
+    }
+
 
     int GetPendingCount()
     {

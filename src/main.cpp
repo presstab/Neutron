@@ -2328,21 +2328,26 @@ bool CBlock::CheckMasterNodePayment() const
         
     if(pindexBest->GetBlockHash() != hashPrevBlock)
     {
-        printf("*** CheckBlock() : Skipping masternode payment check - nHeight %d Hash %s\n", 
+        printf("CheckBlock() : Skipping masternode payment check - nHeight %d Hash %s\n",
             pindexBest->nHeight+1, GetHash().ToString().c_str());
         return true;
     }
 
     // If it is the initial download then skip the masternode checks
-    if (IsInitialBlockDownload() || GetAdjustedTime() - nTime > 10*60)
+    if (IsInitialBlockDownload())
     {
-        printf("*** CheckBlock() : Is initial download, skipping masternode payment check %d\n", pindexBest->nHeight+1);
+        printf("CheckBlock() : Is initial download, skipping masternode payment check %d\n", pindexBest->nHeight+1);
+        return true;
+    }
+
+    if(!masternodeChecker.Synced())
+    {
+        printf("CheckBlock() : masternodeChecker is not synced, skipping masternode payment check %d\n", pindexBest->nHeight+1);
         return true;
     }
 
     //need to use the stake reward amount, before this was using the full output sum
     CAmount masternodePaymentAmount = GetMasternodePayment(pindexBest->nHeight+1, vtx[1].GetValueOut() - vtx[1].GetValueIn());
-    printf("*** required mn payment %s \n", FormatMoney(masternodePaymentAmount).c_str());
 
     CScript payee;
     bool foundPaymentAmount = false;
@@ -2354,11 +2359,13 @@ bool CBlock::CheckMasterNodePayment() const
     {
         if(vtx[1].vout[i].nValue == masternodePaymentAmount)
         {
+            foundPaymentAmount = true;
+
             //find the masternode winner for this block and see if it is who was payed
             //if the winner does not match then we either don't have this masternode info
             //or this peer gave the wrong person the payment and this block should be rejected
-			if(!masternodePayments.GetBlockPayee(pindexBest->nHeight + 1, payee))
-				foundPayee = false;
+            if(masternodePayments.GetBlockPayee(pindexBest->nHeight + 1, payee))
+                foundPayee = true;
 			
 			if(payee != vtx[1].vout[i].scriptPubKey)
 				continue;
@@ -2373,7 +2380,7 @@ bool CBlock::CheckMasterNodePayment() const
         ExtractDestination(payee, address1);
         CBitcoinAddress address2(address1);
 
-        printf("*** CheckBlock() : Couldn't find masternode payment(%d|%d) or payee(%d|%s) nHeight %d. \n", 
+        printf("CheckBlock() : Couldn't find masternode payment(%d|%d) or payee(%d|%s) nHeight %d. \n",
             foundPaymentAmount, masternodePaymentAmount, foundPayee, address2.ToString().c_str(), pindexBest->nHeight+1);
         return false;
     } 
