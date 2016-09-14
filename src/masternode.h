@@ -292,7 +292,7 @@ public:
     void Sync(CNode* node);
     void CleanPaymentList();
     int LastPayment(CMasterNode& mn);
-	void PopulateMasterNodeWinningList();
+    void PopulateMasterNodeWinningList(int nFutureBlocks);
 
     bool IsEnabled()
     {

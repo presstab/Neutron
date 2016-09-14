@@ -34,6 +34,14 @@ public:
         return mapAccepted.size() > 1 && mapPending.empty();
     }
 
+    vector<CMasterNode> GetAccepted()
+    {
+        vector<CMasterNode> vAccepted;
+        for(map<string, CMasterNode>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
+            vAccepted.push_back((*it).second);
+
+        return vAccepted;
+    }
 
     int GetPendingCount()
     {

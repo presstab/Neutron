@@ -328,16 +328,16 @@ int GetCurrentMasterNode(int mod, int64_t nBlockHeight, int minProtocol)
     return winner;
 }
 
-void CMasternodePayments::PopulateMasterNodeWinningList()
+void CMasternodePayments::PopulateMasterNodeWinningList(int nFutureBlocks)
 {
-	for(unsigned int i = nBestHeight; i < nBestHeight + 20; i ++)
+    vector<CMasterNode> vAccepted = masternodeChecker.GetAccepted();
+    for(unsigned int i = nBestHeight; i < nBestHeight + nFutureBlocks; i ++)
 	{
-		BOOST_FOREACH(CMasterNode mn, vecMasternodes)
+        BOOST_FOREACH(CMasterNode mn, vAccepted)
 		{
 			mn.Check();
-			if(!mn.IsEnabled()) {
+            if(!mn.IsEnabled())
 				continue;
-			}
 			
 			//calculate score based off of block 576 blocks in the past
 			uint256 n = mn.CalculateScore(1, i - 576);
@@ -346,7 +346,7 @@ void CMasternodePayments::PopulateMasterNodeWinningList()
 			//if this block does not have a winner, then assigned this mn as the winner. If it does have a winner, then compare scores and keep the highest.
 			bool fWinner = false;
 
-			if(!vWinningByHeight.count(i))// if this block does not have a winner yet
+            if(!vWinningByHeight.count(i))// if this block does not have a winner yet then this is the winner
 				fWinner = true;
 			else if(vWinningByHeight[i].score < nScore)
 				fWinner = true;
@@ -621,7 +621,7 @@ uint64_t CMasternodePayments::CalculateScore(uint256 blockHash, CTxIn& vin)
 bool CMasternodePayments::GetBlockPayee(int nBlockHeight, CScript& payee)
 {
     //This will recalculate the masternode list each time GetBlockPayee is called
-    //PopulateMasterNodeWinningList();
+    PopulateMasterNodeWinningList(2);
 	
 	BOOST_FOREACH(CMasternodePaymentWinner& winner, vWinning){
         if(winner.nBlockHeight == nBlockHeight) {
@@ -630,8 +630,7 @@ bool CMasternodePayments::GetBlockPayee(int nBlockHeight, CScript& payee)
         }
     }
 	
-	printf("*** unable to find payee \n");
-	printf("*** vWinning size %d \n", vWinning.size());
+    printf("GetBlockPayee: unable to find payee \n");
 	
     return false;
 }
