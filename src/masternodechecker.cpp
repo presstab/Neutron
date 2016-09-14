@@ -154,8 +154,8 @@ bool CMasternodeChecker::Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pu
     CMasterNode mn(addr, vin, pubkey, vchSig, sigTime, pubkey2, protocolVersion);
     mn.UpdateLastSeen(lastUpdated);
 
-    //right now we will consider this verified - after fork time this will need to add to the pending list (remove true flag)
-    AddMasternode(&mn, true);
+    //if this is before protocol 2 then we are not requiring the extra verification
+    AddMasternode(&mn, !IsProtocol2(GetAdjustedTime()));
 
     // if it matches our masternodeprivkey, then we've been remotely activated
     if(pubkey2 == activeMasternode.pubKeyMasternode && protocolVersion == PROTOCOL_VERSION)

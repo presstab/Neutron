@@ -2443,10 +2443,10 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
     //Check For Master Node Payment   
     if(nTime > START_MASTERNODE_PAYMENTS)
     {
-        if(!CheckMasterNodePayment())
-        	printf("*** MASTERNODE CHECK FAILED, REJECT THIS BLOCK AFTER FORK \n");
+        if(!CheckMasterNodePayment() && IsProtocol2(nTime))
+             return DoS(100, error("CheckBlock() : MasterNode payment check failed"));
         else
-        	printf("*** MASTERNODE CHECK PASSED \n");
+            printf("MASTERNODE CHECK PASSED \n");
     }
 
     // Check transactions
