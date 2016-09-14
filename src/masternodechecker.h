@@ -19,7 +19,8 @@ public:
         mapPending.clear();
         mapRejected.clear();
     }
-
+    
+    bool Dsee(CNode* pfrom, CMasterNode* mn);
     bool Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pubkey, CPubKey pubkey2, vector<unsigned char> vchSig, int64_t sigTime ,int64_t lastUpdated, int protocolVersion);
     void AddMasternode(CMasterNode* mn, bool fVerified = false);
     void SendVerifyRequest(CMasterNode* mn, CNode* pnode);

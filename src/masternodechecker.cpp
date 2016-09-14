@@ -33,6 +33,11 @@ void CMasternodeChecker::AddMasternode(CMasterNode* mn, bool fVerified)
     mapTemp[mn->vin.prevout.ToString()] = *mn;
 }
 
+bool CMasternodeChecker::Dsee(CNode* pfrom, CMasterNode* mn)
+{
+    return Dsee(pfrom, mn->vin, mn->addr, mn->pubkey, mn->pubkey2, mn->sig, mn->now, mn->lastTimeSeen, mn->protocolVersion);
+}
+
 bool CMasternodeChecker::Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pubkey, CPubKey pubkey2, vector<unsigned char> vchSig, int64_t sigTime
                               ,int64_t lastUpdated, int protocolVersion)
 {
@@ -53,7 +58,7 @@ bool CMasternodeChecker::Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pu
     }
 
     CScript pubkeyScript;
-    pubkeyScript =GetScriptForDestination(pubkey.GetID());
+    pubkeyScript = GetScriptForDestination(pubkey.GetID());
 
     if(pubkeyScript.size() != 25)
     {
@@ -150,7 +155,7 @@ bool CMasternodeChecker::Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pu
     mn.UpdateLastSeen(lastUpdated);
 
     //right now we will consider this verified - after fork time this will need to add to the pending list (remove true flag)
-    masternodeChecker.AddMasternode(&mn, true);
+    AddMasternode(&mn, true);
 
     // if it matches our masternodeprivkey, then we've been remotely activated
     if(pubkey2 == activeMasternode.pubKeyMasternode && protocolVersion == PROTOCOL_VERSION)
@@ -381,7 +386,7 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
         vRecv >> vin >> addr >> vchSig >> sigTime >> pubkey >> pubkey2 >> lastUpdated >> protocolVersion;
         CMasterNode mn(addr, vin, pubkey, vchSig, sigTime, pubkey2, protocolVersion);
 
-        AddMasternode(&mn);
+        Dsee(pfrom, &mn);
         printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mn list from %s, size=%d\n", pfrom->addr.ToString().c_str());
     }
 }
