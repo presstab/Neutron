@@ -142,7 +142,7 @@ bool CMasternodeChecker::Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pu
     {
         printf("dsee - Input must have least %d confirmations\n", MASTERNODE_MIN_CONFIRMATIONS);
         pfrom->Misbehaving(20);
-        return;
+        return false;
     }
 
     // use this as a peer
@@ -241,6 +241,22 @@ void CMasternodeChecker::RequestSyncWithPeers()//accessed in net.cpp
             pnode->PushMessage("mncount");
             printf("CMasternodeChecker::RequestSyncWithPeers(): requesting mncount from %s\n", pnode->addr.ToString().c_str());
         //}
+    }
+}
+
+void CMasternodeChecker::CheckMasternodes()
+{
+    for(map<string, CMasterNode>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
+    {
+        CMasterNode* mn = &(*it).second;
+
+        //mask the time to every 34 minutes
+        int64_t nMaskedTime = (mn->checkTime & 0x800);
+        if(GetAdjustedTime() - nMaskedTime > (34*60))
+        {
+            mapPending[mn->vin.prevout.ToString()] = *mn;
+            mapAccepted.erase(mn->vin.prevout.ToString());
+        }
     }
 }
 

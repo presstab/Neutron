@@ -1406,6 +1406,7 @@ void static CheckMasterNodeSync()
         return;
 
     nLastCheck = GetTime();
+    masternodeChecker.CheckMasternodes();
     masternodeChecker.RequestSyncWithPeers();
 }
 

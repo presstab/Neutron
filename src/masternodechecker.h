@@ -27,6 +27,7 @@ public:
     void Reject(CMasterNode* mn);
     void Reject(CMasterNode* mn, CNode* pnode);
     void RequestSyncWithPeers();
+    void CheckMasternodes();
     void SendList(CNode* pnode);
     void ProcessCheckerMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
     bool Synced()
