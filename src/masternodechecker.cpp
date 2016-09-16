@@ -197,6 +197,8 @@ void CMasternodeChecker::Reject(CMasterNode* mn)
            mapAccepted.size(),
            mapPending.size(),
            mapRejected.size());
+
+    SendRejected(*mn);
 }
 
 void CMasternodeChecker::Reject(CMasterNode* mn, CNode* pnode)
@@ -249,10 +251,7 @@ void CMasternodeChecker::CheckMasternodes()
     for(map<string, CMasterNode>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
     {
         CMasterNode* mn = &(*it).second;
-
-        //mask the time to every 34 minutes
-        int64_t nMaskedTime = (mn->checkTime & 0x800);
-        if(GetAdjustedTime() - nMaskedTime > (34*60))
+        if(GetAdjustedTime() - mn->checkTime > (30*60))
         {
             mapPending[mn->vin.prevout.ToString()] = *mn;
             mapAccepted.erase(mn->vin.prevout.ToString());
@@ -260,10 +259,14 @@ void CMasternodeChecker::CheckMasternodes()
     }
 }
 
+void CMasternodeChecker::SendRejected(CMasterNode mn)
+{
+    BOOST_FOREACH(CNode* pnode, vNodes)
+        pnode->PushMessage("mnrejected", mn.vin.prevout.ToString());
+}
+
 void CMasternodeChecker::SendList(CNode *pnode)
 {
-   // ReconcileLists();
-
     for(map<string, CMasterNode>::iterator it = mapPending.begin(); it != mapPending.end(); it++)
     {
         CMasterNode mn = (*it).second;
@@ -404,5 +407,24 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
 
         Dsee(pfrom, &mn);
         printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mn list from %s, size=%d\n", pfrom->addr.ToString().c_str());
+    }
+    else if(strCommand == "mnrejected")
+    {
+        string strPrevout;
+        vRecv >> strPrevout;
+
+        //peer is telling us that they were unable to verify a masternode
+        if(mapAccepted.count(strPrevout))
+        {
+            CMasterNode* mn = &mapAccepted[strPrevout];
+
+            //if we checked this as little as 5 minutes ago, then lets ignore this
+            if(GetAdjustedTime() - mn->checkTime < (5*60))
+                return;
+
+            printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mnrejected, rechecking this mn \n");
+            mapPending[mn->vin.prevout.ToString()] = *mn;
+            mapAccepted.erase(mn->vin.prevout.ToString());
+        }
     }
 }

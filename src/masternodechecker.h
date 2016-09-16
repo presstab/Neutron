@@ -26,6 +26,7 @@ public:
     void Accept(CMasterNode* mn, CNode* pnode);
     void Reject(CMasterNode* mn);
     void Reject(CMasterNode* mn, CNode* pnode);
+    void SendRejected(CMasterNode mn);
     void RequestSyncWithPeers();
     void CheckMasternodes();
     void SendList(CNode* pnode);
