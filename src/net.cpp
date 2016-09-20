@@ -1449,6 +1449,18 @@ void static ConnectToMasternodes()
 
 }
 
+int nLastGetBlocks;
+void static SendGetBlocks()
+{
+    if(GetTime() - nLastGetBlocks > 30)
+    {
+        BOOST_FOREACH(CNode* pnode, vNodes)
+            pnode->PushGetBlocks(pindexBest, uint256(0));
+
+        nLastGetBlocks = GetTime();
+    }
+}
+
 void static ThreadStakeMiner(void* parg)
 {
     printf("ThreadStakeMiner started\n");
@@ -1588,6 +1600,9 @@ void ThreadOpenConnections2(void* parg)
 
         if (addrConnect.IsValid())
             OpenNetworkConnection(addrConnect, &grant);
+
+        //keep in sync with peers
+        SendGetBlocks();
 
         //keep in sync with masternodes
         CheckMasterNodeSync();
