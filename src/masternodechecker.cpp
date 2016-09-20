@@ -238,11 +238,11 @@ void CMasternodeChecker::RequestSyncWithPeers()//accessed in net.cpp
 {
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        //if(pnode->nVersion == PROTOCOL_VERSION)
-       // {
+        if(IsProtocol2Node(pnode->nVersion))
+        {
             pnode->PushMessage("mncount");
             printf("CMasternodeChecker::RequestSyncWithPeers(): requesting mncount from %s\n", pnode->addr.ToString().c_str());
-        //}
+        }
     }
 }
 

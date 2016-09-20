@@ -1433,7 +1433,7 @@ void static ConnectToMasternodes()
     bool fSent = false;
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        if(pnode->nVersion >= MIN_PEER_PROTO_VERSION && pnode->addr == mn->addr)
+        if(IsProtocol2Node(pnode->nVersion) && pnode->addr == mn->addr)
         {
             printf("***ConnectToMasternodes(): checking node %s \n", pnode->addr.ToString().c_str());
             masternodeChecker.SendVerifyRequest(mn, pnode);
@@ -1444,7 +1444,7 @@ void static ConnectToMasternodes()
     if(!fSent)
     {
         mn->connectAttempts++;
-        printf("ConnectToMasternodes(): failed to send to node \n");
+        printf("***ConnectToMasternodes(): failed to send to node \n");
     }
 
 }
