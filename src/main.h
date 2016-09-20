@@ -91,6 +91,10 @@ inline bool IsProtocol2(int64_t nTime)
 {
     return nTime > PROTOCOL2_TIME;
 }
+inline bool IsProtocol2Node(int nVersion)
+{
+    return nVersion >= PROTOCOL2_VERSION;
+}
 
 
 extern libzerocoin::Params* ZCParams;

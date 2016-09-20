@@ -2366,6 +2366,8 @@ bool CBlock::CheckMasterNodePayment() const
             //or this peer gave the wrong person the payment and this block should be rejected
             if(masternodePayments.GetBlockPayee(pindexBest->nHeight + 1, payee))
                 foundPayee = true;
+
+            printf("CheckBlock() found payee: %s\n", payee.ToString().c_str());
 			
 			if(payee != vtx[1].vout[i].scriptPubKey)
 				continue;

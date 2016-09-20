@@ -328,52 +328,6 @@ int GetCurrentMasterNode(int mod, int64_t nBlockHeight, int minProtocol)
     return winner;
 }
 
-void CMasternodePayments::PopulateMasterNodeWinningList(int nFutureBlocks)
-{
-    vector<CMasterNode> vAccepted = masternodeChecker.GetAccepted();
-    for(unsigned int i = nBestHeight; i < nBestHeight + nFutureBlocks; i ++)
-	{
-        BOOST_FOREACH(CMasterNode mn, vAccepted)
-		{
-			mn.Check();
-            if(!mn.IsEnabled())
-				continue;
-			
-			//calculate score based off of block 576 blocks in the past
-			uint256 n = mn.CalculateScore(1, i - 576);
-			uint64_t nScore =  n.Get64();
-			
-			//if this block does not have a winner, then assigned this mn as the winner. If it does have a winner, then compare scores and keep the highest.
-			bool fWinner = false;
-
-            if(!vWinningByHeight.count(i))// if this block does not have a winner yet then this is the winner
-				fWinner = true;
-			else if(vWinningByHeight[i].score < nScore)
-				fWinner = true;
-			
-			//add this mn as winner
-			if(fWinner)
-			{
-				CMasternodePaymentWinner newWinner;
-				newWinner.nBlockHeight = i;
-				newWinner.vin = mn.vin;
-				newWinner.payee = GetScriptForDestination(mn.pubkey.GetID());
-				newWinner.vchSig = mn.sig;
-				newWinner.score = nScore;
-				vWinningByHeight[i] = newWinner;
-				printf("PopulateMasterNodeWinnerList(): height %d , score= %d, winner vin = %s \n", i, nScore,mn.vin.ToString().c_str());
-			}
-		}
-	}
-
-	vWinning.clear();
-	for(map<unsigned int, CMasternodePaymentWinner>::iterator it = vWinningByHeight.begin(); it != vWinningByHeight.end(); it++)
-	{
-		CMasternodePaymentWinner mpw = (*it).second;
-		vWinning.push_back(mpw);
-	}
-}
-
 int GetMasternodeByRank(int findRank, int64_t nBlockHeight, int minProtocol)
 {
     LOCK(cs_masternodes);
@@ -618,12 +572,59 @@ uint64_t CMasternodePayments::CalculateScore(uint256 blockHash, CTxIn& vin)
     return n4.Get64();
 }
 
+void CMasternodePayments::PopulateMasterNodeWinningList(int nFutureBlocks)
+{
+    vector<CMasterNode> vAccepted = masternodeChecker.GetAccepted();
+    for(unsigned int i = nBestHeight; i < nBestHeight + nFutureBlocks; i ++)
+    {
+        BOOST_FOREACH(CMasterNode mn, vAccepted)
+        {
+            mn.Check();
+            if(!mn.IsEnabled())
+                continue;
+
+            //calculate score based off of block 576 blocks in the past
+            uint256 n = mn.CalculateScore(1, i - 576);
+            uint64_t nScore =  n.Get64();
+
+            //if this block does not have a winner, then assigned this mn as the winner. If it does have a winner, then compare scores and keep the highest.
+            bool fWinner = false;
+
+            if(!vWinningByHeight.count(i))// if this block does not have a winner yet then this is the winner
+                fWinner = true;
+            else if(vWinningByHeight[i].score < nScore)
+                fWinner = true;
+
+            //add this mn as winner
+            if(fWinner)
+            {
+                CMasternodePaymentWinner newWinner;
+                newWinner.nBlockHeight = i;
+                newWinner.vin = mn.vin;
+                newWinner.payee = GetScriptForDestination(mn.pubkey.GetID());
+                newWinner.vchSig = mn.sig;
+                newWinner.score = nScore;
+                vWinningByHeight[i] = newWinner;
+                printf("PopulateMasterNodeWinnerList(): height %d , score= %d, winner vin = %s \n", i, nScore,mn.vin.ToString().c_str());
+            }
+        }
+    }
+
+    vWinning.clear();
+    for(map<unsigned int, CMasternodePaymentWinner>::iterator it = vWinningByHeight.begin(); it != vWinningByHeight.end(); it++)
+    {
+        CMasternodePaymentWinner mpw = (*it).second;
+        vWinning.push_back(mpw);
+    }
+}
+
 bool CMasternodePayments::GetBlockPayee(int nBlockHeight, CScript& payee)
 {
     //This will recalculate the masternode list each time GetBlockPayee is called
     PopulateMasterNodeWinningList(2);
 	
-	BOOST_FOREACH(CMasternodePaymentWinner& winner, vWinning){
+    BOOST_FOREACH(CMasternodePaymentWinner& winner, vWinning)
+    {
         if(winner.nBlockHeight == nBlockHeight) {
             payee = winner.payee;
             return true;
