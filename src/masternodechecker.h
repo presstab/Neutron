@@ -33,6 +33,9 @@ public:
     void ProcessCheckerMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv);
     bool Synced()
     {
+        if(mapArgs.count("-connect"))
+            return false;
+
         return mapAccepted.size() > 1 && mapPending.empty();
     }
 
