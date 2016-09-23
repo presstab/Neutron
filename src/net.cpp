@@ -28,6 +28,8 @@
 using namespace std;
 using namespace boost;
 
+extern CMasternodeChecker masternodeChecker;
+
 static const int MAX_OUTBOUND_CONNECTIONS = 16;
 
 void ThreadMessageHandler2(void* parg);

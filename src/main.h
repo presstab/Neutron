@@ -32,7 +32,6 @@ class CRequestTracker;
 class CTxIn;
 class CTxMemPool;
 class CNode;
-class CMasternodeChecker;
 
 #define START_MASTERNODE_PAYMENTS_TESTNET 1432123200 
 #define START_MASTERNODE_PAYMENTS 1432123200 
@@ -123,7 +122,6 @@ extern CCriticalSection cs_setpwalletRegistered;
 extern std::set<CWallet*> setpwalletRegistered;
 extern unsigned char pchMessageStart[4];
 extern std::map<uint256, CBlock*> mapOrphanBlocks;
-extern CMasternodeChecker masternodeChecker;
 
 // Settings
 extern int64_t nTransactionFee;

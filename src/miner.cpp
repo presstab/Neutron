@@ -7,6 +7,7 @@
 #include "txdb.h"
 #include "miner.h"
 #include "kernel.h"
+#include "masternodechecker.h"
 
 using namespace std;
 
@@ -16,6 +17,7 @@ using namespace std;
 //
 
 extern unsigned int nMinerSleep;
+extern CMasternodeChecker masternodeChecker;
 
 int static FormatHashBlocks(void* pbuffer, unsigned int len)
 {

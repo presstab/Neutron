@@ -383,8 +383,8 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
     }
     else if(strCommand == "mncount")
     {
-        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncount, sending back count of %d\n", masternodeChecker.GetMasternodeCount());
-        pfrom->PushMessage("mncounted", masternodeChecker.GetMasternodeCount());
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncount, sending back count of %d\n", GetMasternodeCount());
+        pfrom->PushMessage("mncounted", GetMasternodeCount());
     }
     else if(strCommand == "mncounted")
     {
