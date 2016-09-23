@@ -540,7 +540,7 @@ void StakeMiner(CWallet *pwallet)
                 return;
         }
 
-        while (vNodes.empty() || IsInitialBlockDownload())
+        while (vNodes.empty() || IsInitialBlockDownload() || !masternodeChecker.Synced())
         {
             nLastCoinStakeSearchInterval = 0;
             fTryToSync = true;
