@@ -89,9 +89,10 @@ bool CMasternodeChecker::Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pu
     //search existing masternode list, this is where we update existing masternodes with new dsee broadcasts
     if(AlreadyHave(vin.prevout.ToString()))
     {
-        CMasterNode* mn = NULL;
-        if(!Get(vin.prevout.ToString(), mn))
+        if(!mapAccepted.count(vin.prevout.ToString()))
             return false;
+
+        CMasterNode* mn = &mapAccepted[vin.prevout.ToString()];
 
         if(mn->pubkey == pubkey && !mn->UpdatedWithin(MASTERNODE_MIN_DSEE_SECONDS))
         {
@@ -245,6 +246,7 @@ void CMasternodeChecker::RequestSyncWithPeers()//accessed in net.cpp
         }
         else
         {
+            printf("CMasternodeChecker::RequestSyncWithPeers(): requesting mncount from %s\n", pnode->addr.ToString().c_str());
             pnode->PushMessage("dseg", CTxIn());
         }
     }
@@ -252,15 +254,20 @@ void CMasternodeChecker::RequestSyncWithPeers()//accessed in net.cpp
 
 void CMasternodeChecker::CheckMasternodes()
 {
+    vector<string> vErase;
     for(map<string, CMasterNode>::iterator it = mapAccepted.begin(); it != mapAccepted.end(); it++)
     {
+        printf("*** CheckMasternodes\n");
         CMasterNode* mn = &(*it).second;
         if(GetAdjustedTime() - mn->checkTime > (30*60))
         {
             mapPending[mn->vin.prevout.ToString()] = *mn;
-            mapAccepted.erase(mn->vin.prevout.ToString());
+            vErase.push_back(mn->vin.prevout.ToString());
         }
     }
+
+    BOOST_FOREACH(string s, vErase)
+            mapAccepted.erase(s);
 }
 
 void CMasternodeChecker::SendRejected(CMasterNode mn)
