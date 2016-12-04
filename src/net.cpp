@@ -1428,7 +1428,8 @@ void static ConnectToMasternodes()
     }
 
     printf("***ConnectToMasternodes(): try to connect to %s\n", mn->addr.ToString().c_str());
-    ConnectNode((CAddress)mn->addr, mn->addr.ToString().c_str(), true);
+    addrman.Add((CAddress)mn->addr, mn->addr, 2*60*60);
+   // ConnectNode((CAddress)mn->addr, mn->addr.ToString().c_str(), true);
     MilliSleep(500);
 
     LOCK(cs_vNodes);
