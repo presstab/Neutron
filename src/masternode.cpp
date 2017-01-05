@@ -68,8 +68,7 @@ void ProcessMessageMasternode(CNode* pfrom, std::string& strCommand, CDataStream
         // 70047 and greater
         vRecv >> vin >> addr >> vchSig >> sigTime >> pubkey >> pubkey2 >> count >> current >> lastUpdated >> protocolVersion;
 
-        if(!masternodeChecker.Dsee(pfrom, vin, addr, pubkey, pubkey2, vchSig, sigTime, lastUpdated, protocolVersion))
-            printf("dsee - Rejected new masternode entry %s\n", addr.ToString().c_str());
+        masternodeChecker.Dsee(pfrom, vin, addr, pubkey, pubkey2, vchSig, sigTime, lastUpdated, protocolVersion);
     }
 
     else if (strCommand == "dseep") { //DarkSend Election Entry Ping

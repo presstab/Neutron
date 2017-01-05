@@ -1418,6 +1418,11 @@ void static ConnectToMasternodes()
         return;
 
     CMasterNode* mn = masternodeChecker.GetNextPending();
+    if(mn == NULL)
+        return;
+
+    //increment our connectAttempts counter
+    mn->connectAttempts++;
 
     //if we have tried to connect 5 times, lets consider this mn as invalid
     if(mn->connectAttempts > 5)
@@ -1427,25 +1432,38 @@ void static ConnectToMasternodes()
         masternodeChecker.Reject(mn);
     }
 
-    printf("***ConnectToMasternodes(): try to connect to %s\n", mn->addr.ToString().c_str());
-    ConnectNode((CAddress)mn->addr, mn->addr.ToString().c_str(), true);
-    MilliSleep(500);
+    //check to see if we are already connected to this node before attempting to connect
+    bool isConnected = false;
+    BOOST_FOREACH(CNode* pnode, vNodes)
+    {
+        if(pnode->addr == mn->addr)
+            isConnected = true;
+    }
 
+    //attempt connection to node if we arent already connected
+    if(!isConnected)
+    {
+        printf("***ConnectToMasternodes(): try to connect to %s\n", mn->addr.ToString().c_str());
+        ConnectNode((CAddress) mn->addr, mn->addr.ToString().c_str(), true);
+        MilliSleep(750);
+    }
+
+    //send a verify request to the masternode
     LOCK(cs_vNodes);
     bool fSent = false;
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        if(IsProtocol2Node(pnode->nVersion) && pnode->addr == mn->addr)
+        if(/*IsProtocol2Node(pnode->nVersion) &&*/ pnode->addr == mn->addr)
         {
             printf("***ConnectToMasternodes(): checking node %s \n", pnode->addr.ToString().c_str());
             masternodeChecker.SendVerifyRequest(mn, pnode);
             fSent = true;
+            break;
         }
     }
 
     if(!fSent)
     {
-        mn->connectAttempts++;
         printf("***ConnectToMasternodes(): failed to send to node \n");
     }
 

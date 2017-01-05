@@ -156,7 +156,7 @@ bool CMasternodeChecker::Dsee(CNode* pfrom, CTxIn vin, CService addr, CPubKey pu
     mn.UpdateLastSeen(lastUpdated);
 
     //if this is before protocol 2 then we are not requiring the extra verification
-    AddMasternode(&mn, !IsProtocol2(GetAdjustedTime()));
+    AddMasternode(&mn, false);//!IsProtocol2(GetAdjustedTime()));
 
     // if it matches our masternodeprivkey, then we've been remotely activated
     if(pubkey2 == activeMasternode.pubKeyMasternode && protocolVersion == PROTOCOL_VERSION)
@@ -224,6 +224,7 @@ void CMasternodeChecker::SendVerifyRequest(CMasterNode* mn, CNode* pnode)
     }
 
     printf("***CMasternodeChecker:: Sending verify request to %s \n", pnode->addr.ToString().c_str());
+
     //create a hash of non deterministic random vars and ask mn to sign it
     CDataStream ss(SER_GETHASH, 0);
     ss << rand() << GetTime() << GetPendingCount();
@@ -302,7 +303,20 @@ CMasterNode* CMasternodeChecker::GetNextPending()
     if(mapPending.empty())
         return NULL;
 
-    return &(*mapPending.begin()).second;
+    CMasterNode* mn = NULL;
+    for(map<string, CMasterNode>::iterator it = mapPending.begin(); it != mapPending.end(); it++)
+    {
+        mn = &(*mapPending.begin()).second;
+
+        //if we already asked this node in the last 30 seconds then skip to the next
+        if (GetTime() - mn->checkTime < 30)
+            continue;
+
+        //return this masternode
+        return mn;
+    }
+
+    return NULL;
 }
 
 void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCommand, CDataStream& vRecv)
@@ -386,18 +400,18 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
 
         //this mn passed the test, mark as valid
         Accept(mn, pfrom);
-        printf("***CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode is valid\n");
+        printf("***CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode is valid, address %s\n", pfrom->addr.ToString().c_str());
     }
     else if(strCommand == "mncount")
     {
-        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncount, sending back count of %d\n", GetMasternodeCount());
+        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncount from %s, sending back count of %d\n", pfrom->addr.ToString().c_str(), GetMasternodeCount());
         pfrom->PushMessage("mncounted", GetMasternodeCount());
     }
     else if(strCommand == "mncounted")
     {
         int nCount = 0;
         vRecv >> nCount;
-        printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mncounted of %d\n", nCount);
+        printf("***CMasternodeChecker::ProcessCheckerMessage() received mncounted of %d from %s\n", nCount, pfrom->addr.ToString().c_str());
 
         //if(!InSync(nCount))
             SendList(pfrom);
@@ -433,7 +447,7 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
             if(GetAdjustedTime() - mn->checkTime < (5*60))
                 return;
 
-            printf("***CMasternodeChecker::ProcessCheckerMessage() recieved mnrejected, rechecking this mn \n");
+            printf("***CMasternodeChecker::ProcessCheckerMessage() received mnrejected, rechecking this mn \n");
             mapPending[mn->vin.prevout.ToString()] = *mn;
             mapAccepted.erase(mn->vin.prevout.ToString());
         }
