@@ -55,7 +55,7 @@ public:
 
     int GetMasternodeCount()
     {
-        return mapAccepted.size() + mapPending.size();
+        return mapAccepted.size();
     }
 
     bool InSync(int nCount);

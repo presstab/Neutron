@@ -6,13 +6,9 @@
 
 void CMasternodeChecker::AddMasternode(CMasterNode* mn, bool fVerified)
 {
-    if(AlreadyHave(mn))
-        return;
-
-    printf("***CMasternodeChecker::AddMasternode adding mn\n");
-
     if(fVerified)
     {
+        printf("***CMasternodeChecker::AddMasternode adding mn as accepted\n");
         mapAccepted[mn->vin.prevout.ToString()] = *mn;
 
         //this is redundant, ultimately it would be best to refactor legacy code
@@ -306,10 +302,10 @@ CMasterNode* CMasternodeChecker::GetNextPending()
     CMasterNode* mn = NULL;
     for(map<string, CMasterNode>::iterator it = mapPending.begin(); it != mapPending.end(); it++)
     {
-        mn = &(*mapPending.begin()).second;
+        mn = &(*it).second;
 
-        //if we already asked this node in the last 30 seconds then skip to the next
-        if (GetTime() - mn->checkTime < 30)
+        //if we already asked this node in the last 60 seconds then skip to the next
+        if (GetTime() - mn->checkTime < 60)
             continue;
 
         //return this masternode
@@ -401,6 +397,7 @@ void CMasternodeChecker::ProcessCheckerMessage(CNode* pfrom, std::string& strCom
         //this mn passed the test, mark as valid
         Accept(mn, pfrom);
         printf("***CMasternodeChecker::ProcessCheckerMessage() mnprove - masternode is valid, address %s\n", pfrom->addr.ToString().c_str());
+        AddMasternode(mn, true);
     }
     else if(strCommand == "mncount")
     {
