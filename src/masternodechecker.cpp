@@ -243,7 +243,7 @@ void CMasternodeChecker::RequestSyncWithPeers()//accessed in net.cpp
         }
         else
         {
-            printf("CMasternodeChecker::RequestSyncWithPeers(): requesting mncount from %s\n", pnode->addr.ToString().c_str());
+            printf("CMasternodeChecker::RequestSyncWithPeers(): requesting dseg from %s\n", pnode->addr.ToString().c_str());
             pnode->PushMessage("dseg", CTxIn());
         }
     }
