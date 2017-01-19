@@ -6,6 +6,11 @@
 
 void CMasternodeChecker::AddMasternode(CMasterNode* mn, bool fVerified)
 {
+    if(AlreadyHave(mn))
+    {
+        printf("***CMasternodeChecker::AddMasternode already have mn %s\n", mn->vin.ToString().c_str());
+        return;
+    }
     if(fVerified)
     {
         printf("***CMasternodeChecker::AddMasternode adding mn as accepted\n");

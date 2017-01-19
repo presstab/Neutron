@@ -1453,8 +1453,14 @@ void static ConnectToMasternodes()
     bool fSent = false;
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
-        if(/*IsProtocol2Node(pnode->nVersion) &&*/ pnode->addr == mn->addr)
+        if(pnode->addr == mn->addr)
         {
+            if(!IsProtocol2Node(pnode->nVersion))
+            {
+                printf("***ConnectToMasternodes(): mn: %s is not protocol 2\n", mn->addr.ToString().c_str());
+                masternodeChecker.Reject(mn);
+            }
+
             printf("***ConnectToMasternodes(): checking node %s \n", pnode->addr.ToString().c_str());
             masternodeChecker.SendVerifyRequest(mn, pnode);
             fSent = true;
